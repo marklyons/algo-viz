@@ -1,19 +1,22 @@
 # algo-viz
 
 A learning tool for algorithm problems: write a real Python solution, run it
-against a test case, then **step or scrub through the actual execution** —
-every variable renders on an infinite canvas exactly as your code produced
-it, live. No canned animations, no problem-specific scripting. Built to
-double as a clean recording surface for LeetCode explainer videos (the
-scrubber is your video timeline).
+against a test case, then then you can step through the actual execution and 
+see variable changes, loops, etc. live. This works great for visualizing accurate
+solutions as well as debugging failing attempts. The initial build of this was
+pretty vibe coded but I am starting to clean up different features by hand.
 
 ![algo-viz stepping through a sorted-map solution to Odd Even Jump, with a loop box and index connectors](docs/screenshot.png)
 
 ## How it works
 
+**For now this project is incomplete, but it has enough features to visualize
+many different algorithmic problems. In the future I plan to add a lot of advanced
+data structures as that is where I think it has the most educational benefit.**
+
 `backend/tracer.py` runs your submitted code under `sys.settrace`,
-snapshotting every local variable at every executed line. The frontend just
-replays that list of snapshots. Because nothing is hardcoded to a specific
+snapshotting every local variable at every executed line. The frontend
+replays that list of snapshots. Nothing is hardcoded to a specific
 problem's variable names, the same engine renders whatever *you* name:
 
 - A list named `stack` (or anything with "stack" in it) renders as a LIFO
@@ -26,19 +29,14 @@ problem's variable names, the same engine renders whatever *you* name:
   run through" preview (the real sequence for a `for x in some_list:`, the
   actual index countdown for `range(a, b, c)`, or a plain counter as a
   fallback) plus whichever variables were first bound inside that loop.
-  Leave the loop and its box — and everything scoped to it — disappears;
-  step back in and it's rebuilt.
 - If a loop's own index variable is used to subscript an array directly
   (`arr[i]`, found via a plain AST scan, no need to step into a helper
   function that does it), a line is drawn from the loop's current position
-  to that array's matching cell, live.
+  to that array's matching cell.
 - Function parameters stay pinned in their own strip above the canvas,
   separate from everything the algorithm computes — and every value there
   is click-to-edit, so you can hand-author a test case without touching
   the test dropdown.
-
-None of this is per-problem configuration. It falls out of watching what
-the trace actually contains at each step.
 
 ## Run it
 
@@ -99,8 +97,7 @@ algo-viz/
 Everything shown in the browser comes from one of two JSON endpoints:
 `GET /api/problems/<id>` (the static problem definition) and
 `POST /api/run` (one traced execution, plus the AST loop analysis for that
-run). `app.js` owns all rendering — there's no build step, no framework,
-just the DOM.
+run). `app.js` owns all rendering.
 
 ## Adding another problem
 
@@ -110,15 +107,18 @@ like the one in `exclusive_time.py` (`id`, `title`, `leetcode_url`,
 `func_name`, `arg_names`, `description`, `starter_code`, `tests`). It shows
 up in the problem dropdown automatically — the array/stack/map/scalar/loop
 rendering is fully generic, so no frontend changes are needed unless a
-problem needs a genuinely new representation (a tree or graph, say).
+problem needs a genuinely new representation (a tree or graph, but I plan
+to add some of these later as well)
 
 ## Notes / current limits
 
 - Recursion is traced (a recursive call to the *same* function keeps
   tracing normally), but a nested helper function the solution defines
-  internally (a custom bisect helper, say) is deliberately stepped over,
+  internally (a custom helper for example) is deliberately stepped over,
   not into — its internals would just fragment the visualization of the
-  algorithm's own state. Its return value still flows back normally.
+  algorithm's own state. Its return value still flows back normally. In
+  the future, I can probably add some control around this so that you can
+  decide what you'd actually step into in terms of the visualization.
 - The loop → array index connector only fires for a `for` loop with a
   simple index variable (`for i in ...`), not a tuple target
   (`for k, v in ...`) or a `while` loop.
