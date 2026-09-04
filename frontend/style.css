@@ -1,0 +1,369 @@
+:root {
+  --ink: #1c1c1c;
+  --ink-soft: #6b6b6b;
+  --ink-faint: #b7b7b7;
+  --paper: #fdfdfb;
+  --paper-dim: #f4f3ef;
+  --line: #dcdad2;
+  --accent: #2b6cff;
+  --good: #1f9d55;
+  --bad: #e0483e;
+  --mono: "SF Mono", "Fira Code", Menlo, Consolas, monospace;
+  --hand: "Kalam", "Comic Sans MS", cursive;
+}
+
+* { box-sizing: border-box; }
+.hidden { display: none !important; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--mono);
+  overflow: hidden;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.brand { font-family: var(--hand); font-size: 17px; font-weight: 700; color: var(--ink); }
+.topbar select {
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 2px 4px;
+}
+#leetcodeLink { color: var(--ink-faint); text-decoration: none; font-size: 13px; margin-left: auto; }
+#leetcodeLink:hover { color: var(--accent); }
+
+.main {
+  display: flex;
+  height: calc(100vh - 37px);
+}
+
+.code-col {
+  width: 38%;
+  min-width: 340px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+  background: var(--paper-dim);
+}
+
+.code-wrap { position: relative; flex: 1; min-height: 0; }
+
+#codeMirrorHost { position: absolute; inset: 0; }
+#codeMirrorHost .CodeMirror {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  font-family: var(--mono);
+  font-size: 13.5px;
+  line-height: 1.35;
+}
+#codeMirrorHost .CodeMirror-lines { padding: 12px 0; }
+#codeMirrorHost pre.CodeMirror-line, #codeMirrorHost pre.CodeMirror-line-like { padding: 0 18px; }
+#codeMirrorHost .CodeMirror-gutters { border: none; }
+
+/* minimal whiteboard-matched syntax theme */
+.cm-s-algoviz.CodeMirror { background: transparent; color: var(--ink); }
+.cm-s-algoviz .CodeMirror-gutters { background: transparent; }
+.cm-s-algoviz .CodeMirror-linenumber { color: var(--ink-faint); font-size: 11px; }
+.cm-s-algoviz .CodeMirror-cursor { border-left: 1.5px solid var(--ink); }
+.cm-s-algoviz .cm-keyword { color: #8250df; font-weight: 600; }
+.cm-s-algoviz .cm-def { color: #0550ae; }
+.cm-s-algoviz .cm-variable { color: var(--ink); }
+.cm-s-algoviz .cm-variable-2 { color: var(--ink); }
+.cm-s-algoviz .cm-property { color: var(--ink); }
+.cm-s-algoviz .cm-string { color: #1a7f37; }
+.cm-s-algoviz .cm-number { color: #b35900; }
+.cm-s-algoviz .cm-comment { color: var(--ink-faint); font-style: italic; }
+.cm-s-algoviz .cm-operator { color: #cf222e; }
+.cm-s-algoviz .cm-builtin { color: #0550ae; }
+.cm-s-algoviz .cm-atom { color: #b35900; }
+.cm-s-algoviz .cm-active-line-highlight { background: rgba(43, 108, 255, 0.12); box-shadow: inset 2px 0 0 var(--accent); }
+.cm-s-algoviz.readonly-mode .CodeMirror-cursor { display: none; }
+
+.controls {
+  border-top: 1px solid var(--line);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.row { display: flex; align-items: center; gap: 6px; }
+.playback-row.hidden { display: none; }
+
+select {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink);
+  padding: 4px 6px;
+}
+
+.icon-btn {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 5px;
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+#runBtn { color: var(--accent); border-color: var(--accent); }
+
+.status { font-size: 12px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status.ok { color: var(--good); }
+.status.err { color: var(--bad); }
+
+.scrubber, #speedSlider { accent-color: var(--accent); }
+.scrubber { flex: 1; }
+#speedSlider { width: 70px; }
+.step-counter { font-size: 11px; color: var(--ink-faint); white-space: nowrap; }
+
+.canvas-col { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+
+/* the "given" strip: function parameters, shown and edited separately from
+   everything the algorithm computes below */
+.given-bar {
+  flex: none;
+  background: var(--paper-dim);
+  border-bottom: 2px dashed var(--ink-faint);
+  padding: 14px 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+  flex-wrap: wrap;
+  min-height: 20px;
+}
+.given-bar:empty { padding: 0; min-height: 0; border-bottom: none; }
+/* a shape rendered in normal document flow instead of absolutely
+   positioned on the pannable canvas -- used by the given-bar and by
+   variables living inside a loop box, both of which sit in a plain
+   flex container that handles their layout for free */
+.static-shape { display: flex; flex-direction: column; align-items: flex-start; }
+
+#canvasViewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  cursor: grab;
+}
+#canvasViewport.dragging { cursor: grabbing; }
+#canvasWorld {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6000px;
+  height: 4000px;
+  transform-origin: 0 0;
+  background-image: radial-gradient(circle, var(--line) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
+
+.recenter-btn {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink-soft);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.recenter-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* connects a loop's current position to the array cell its index variable
+   is pointing at (e.g. arr[i]) -- spans given-bar and canvas alike, since
+   the array being indexed might live in either */
+.connector-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 60;
+}
+.connector-line { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; opacity: 0.8; }
+.connector-arrow-fill { fill: var(--accent); }
+.cell.index-highlight { background: rgba(43, 108, 255, 0.15); border-color: var(--accent); }
+
+/* ---- canvas shapes ---- */
+.shape {
+  position: absolute;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.shape.entering { opacity: 0; transform: translateY(8px) scale(0.96); }
+.shape.leaving { opacity: 0; transform: translateY(-6px) scale(0.96); }
+
+.shape.draggable { cursor: move; user-select: none; }
+.shape.dragging {
+  z-index: 30;
+  opacity: 0.92;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  transition: none;
+}
+
+/* alignment guides shown while dragging a shape near another's edge/center */
+.snap-guide { position: absolute; background: var(--accent); opacity: 0.6; pointer-events: none; z-index: 40; display: none; }
+.snap-guide-v { top: 0; width: 1px; height: 4000px; }
+.snap-guide-h { left: 0; height: 1px; width: 6000px; }
+
+.caption {
+  font-family: var(--hand);
+  font-size: 15px;
+  color: var(--ink-soft);
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+/* A structure reads as one solid rectangle divided by internal lines, not
+   a row of separate floating boxes — each cell contributes only the
+   border(s) it needs so adjacent cells share a single dividing line. */
+.cell {
+  font-family: var(--mono);
+  font-size: 13px;
+  min-width: 34px;
+  height: 34px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border: 1.5px solid var(--ink);
+  border-radius: 0;
+  background: var(--paper);
+  transition: transform 0.22s ease, opacity 0.22s ease, background 0.3s ease;
+}
+
+.array-row { display: flex; }
+.array-cell-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.array-cell-wrap + .array-cell-wrap .array-cell { border-left: none; }
+.array-idx { font-size: 9px; color: var(--ink-faint); font-family: var(--mono); }
+
+/* map / sorted-map: key over value, same continuous-rectangle language as
+   arrays. New keys slot into whatever position their sort order puts them
+   (a real sorted map can insert in the middle, not just append) */
+.map-row { display: flex; }
+.map-cell-wrap + .map-cell-wrap .map-cell { border-left: none; }
+.cell.map-cell {
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  height: auto;
+  min-height: 40px;
+  padding: 5px 8px;
+}
+.map-key { font-weight: 600; }
+.map-value { font-size: 10px; color: var(--ink-soft); }
+
+/* stack: a plain tower of blocks, open at the top so a push visibly has
+   somewhere to land; no wrapping "shell" outline needed */
+.stack-outer { display: flex; flex-direction: column; align-items: flex-start; }
+.stack-body { display: flex; flex-direction: column-reverse; }
+.stack-cell { border-top: none; min-width: 74px; }
+
+.stack-placeholder {
+  width: 36.5px;
+  height: 36.5px;
+  border: 1.5px dashed var(--ink-faint);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-faint);
+}
+.stack-placeholder.hidden, .stack-body.hidden { display: none; }
+
+.cell.cell-enter { opacity: 0; }
+.stack-shape .cell.cell-enter { transform: translateY(-16px) scale(0.85); }
+.array-shape .cell.cell-enter { transform: translateX(14px) scale(0.85); }
+
+.cell.cell-exit { opacity: 0; }
+.stack-shape .cell.cell-exit { transform: translateY(-20px) scale(0.8); }
+.array-shape .cell.cell-exit { transform: translateY(10px) scale(0.8); }
+
+.cell.cell-pulse { background: #fff3cf; border-color: var(--accent); transform: scale(1.12); }
+
+/* loop container: appears only while execution is actually inside the
+   loop's line range, holds a small "what will this run through" preview
+   plus the loop's own variables, scoped separately from outer ones */
+.loop-box {
+  border: 1.5px dashed var(--accent);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(43, 108, 255, 0.035);
+}
+.loop-track { display: flex; }
+.loop-track-cell {
+  color: var(--ink-soft);
+  opacity: 0.55;
+}
+.loop-track-cell.current {
+  opacity: 1;
+  color: var(--ink);
+  border-color: var(--accent);
+  background: rgba(43, 108, 255, 0.12);
+}
+.loop-track-counter {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.loop-track-dots { display: flex; gap: 4px; align-items: center; }
+.loop-track-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  border: 1.5px solid var(--ink-faint);
+  background: transparent;
+}
+.loop-track-dot.current { background: var(--accent); border-color: var(--accent); }
+.loop-vars { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+
+/* given params: same visual language, but editable */
+.given-editable { cursor: text; outline: none; }
+.given-editable:hover { background: rgba(43, 108, 255, 0.05); }
+.given-editable:focus { background: rgba(43, 108, 255, 0.1); border-color: var(--accent); }
+.given-editable.invalid-flash { background: rgba(224, 72, 62, 0.28) !important; }
+
+.scalar-shape .scalar-value {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border: 1.5px solid var(--ink-faint);
+  border-radius: 16px;
+  display: inline-block;
+  background: var(--paper);
+  transition: transform 0.2s ease, background 0.3s ease, border-color 0.3s ease;
+}
+.scalar-shape .scalar-value.pulse {
+  background: #fff3cf;
+  border-color: var(--accent);
+  transform: scale(1.1);
+}

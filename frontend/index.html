@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Algo Viz</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.css">
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/python/python.min.js"></script>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="topbar">
+    <span class="brand">algo-viz</span>
+    <select id="problemSelect"></select>
+    <a id="leetcodeLink" href="#" target="_blank" rel="noopener" title="Open on LeetCode">↗</a>
+  </div>
+
+  <div class="main">
+    <div class="code-col">
+      <div class="code-wrap">
+        <div id="codeMirrorHost" title="Double-click to edit"></div>
+      </div>
+      <div class="controls">
+        <div class="row">
+          <select id="testSelect"></select>
+          <button id="runBtn" class="icon-btn" title="Run">▶</button>
+          <button id="runAllBtn" class="icon-btn" title="Run all tests">✓</button>
+          <button id="resetCodeBtn" class="icon-btn" title="Reset code">↺</button>
+          <button id="editBtn" class="icon-btn hidden" title="Edit code">✎</button>
+          <span id="statusLine" class="status"></span>
+        </div>
+        <div class="row playback-row hidden" id="playbackRow">
+          <button id="stepBack" class="icon-btn" title="Step back">◀</button>
+          <button id="playPause" class="icon-btn" title="Play/Pause">▶</button>
+          <button id="stepFwd" class="icon-btn" title="Step forward">▶</button>
+          <input id="scrubber" type="range" min="0" max="0" value="0" class="scrubber" />
+          <span id="stepCounter" class="step-counter"></span>
+          <input id="speedSlider" type="range" min="50" max="1200" value="450" title="Playback speed" />
+        </div>
+      </div>
+    </div>
+
+    <div class="canvas-col">
+      <div id="givenBar" class="given-bar"></div>
+      <div id="canvasViewport">
+        <div id="canvasWorld"></div>
+      </div>
+      <button id="recenterBtn" class="recenter-btn" title="Recenter">⌂</button>
+      <svg id="connectorOverlay" class="connector-overlay">
+        <defs>
+          <marker id="connectorArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path class="connector-arrow-fill" d="M0,0 L10,5 L0,10 z"></path>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
