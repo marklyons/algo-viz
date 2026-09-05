@@ -583,7 +583,9 @@
       if (value.length > 0 && value.every(v => v === null || isLinkedListNode(v))) {
         return "linked-list-group";
       }
-      return name.toLowerCase().includes("stack") ? "stack" : "array";
+      const lower = name.toLowerCase();
+      if (lower.includes("heap")) return "heap-tree";
+      return lower.includes("stack") ? "stack" : "array";
     }
     if (value !== null && typeof value === "object") return "map";
     return "scalar";
@@ -1007,6 +1009,10 @@
       body = document.createElement("div");
       body.className = "linked-list-group";
       renderLinkedListGroupRows(body, value);
+    } else if (kind === "heap-tree") {
+      body = document.createElement("div");
+      body.className = "heap-tree";
+      renderHeapTree(body, value);
     } else {
       body = document.createElement("div");
       body.className = "scalar-value";
@@ -1062,6 +1068,82 @@
       }
       container.appendChild(row);
     });
+  }
+
+  // A heapq list *is* a binary tree -- for index i, children live at
+  // 2i+1/2i+2 -- just encoded implicitly instead of with real node
+  // objects. Rendered as one, since that's what actually explains why
+  // push/pop work, rather than as an opaque flat array. Redrawn from
+  // scratch on every update: heap operations reshuffle values across
+  // positions (that's the whole point), so there's no stable per-node
+  // identity worth animating between steps, unlike a stack or array.
+  const HEAP_NODE_H = 30;
+  const HEAP_CHAR_W = 7;
+  const HEAP_LEVEL_GAP = 22;
+  const HEAP_NODE_GAP = 10;
+
+  function renderHeapTree(container, items) {
+    container.innerHTML = "";
+    const n = items.length;
+    if (n === 0) {
+      const ph = document.createElement("div");
+      ph.className = "heap-tree-placeholder";
+      ph.textContent = "∅";
+      container.appendChild(ph);
+      return;
+    }
+
+    const texts = items.map(formatValue);
+    const nodeW = Math.max(34, Math.max(...texts.map(t => t.length * HEAP_CHAR_W + 16)));
+    const levels = Math.floor(Math.log2(n)) + 1;
+    const bottomSlots = 2 ** (levels - 1);
+    const slotW = nodeW + HEAP_NODE_GAP;
+    const width = bottomSlots * slotW;
+    const height = levels * (HEAP_NODE_H + HEAP_LEVEL_GAP);
+
+    function posOf(i) {
+      const level = Math.floor(Math.log2(i + 1));
+      const firstAtLevel = 2 ** level - 1;
+      const slotsAtLevel = 2 ** level;
+      const levelWidth = width / slotsAtLevel;
+      return {
+        x: levelWidth * (i - firstAtLevel + 0.5),
+        y: HEAP_NODE_H / 2 + level * (HEAP_NODE_H + HEAP_LEVEL_GAP),
+      };
+    }
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", width);
+    svg.setAttribute("height", height);
+    svg.setAttribute("class", "heap-tree-svg");
+
+    for (let i = 1; i < n; i++) {
+      const parent = Math.floor((i - 1) / 2);
+      const p = posOf(parent), c = posOf(i);
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", p.x); line.setAttribute("y1", p.y);
+      line.setAttribute("x2", c.x); line.setAttribute("y2", c.y);
+      line.setAttribute("class", "heap-edge");
+      svg.appendChild(line);
+    }
+    for (let i = 0; i < n; i++) {
+      const { x, y } = posOf(i);
+      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      rect.setAttribute("x", x - nodeW / 2);
+      rect.setAttribute("y", y - HEAP_NODE_H / 2);
+      rect.setAttribute("width", nodeW);
+      rect.setAttribute("height", HEAP_NODE_H);
+      rect.setAttribute("rx", HEAP_NODE_H / 2);
+      rect.setAttribute("class", "heap-node-rect" + (i === 0 ? " heap-root" : ""));
+      svg.appendChild(rect);
+      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      text.setAttribute("x", x);
+      text.setAttribute("y", y);
+      text.setAttribute("class", "heap-node-text");
+      text.textContent = texts[i];
+      svg.appendChild(text);
+    }
+    container.appendChild(svg);
   }
 
   function makeArrayCell(container, value, idx) {
@@ -1315,6 +1397,14 @@
       // k stays fixed for this shape; only each row's own chain changes.
       // Simplest correct thing is to just redraw every row.
       renderLinkedListGroupRows(shape.body, value);
+      zone.rendered[name] = { kind };
+      return;
+    }
+
+    if (kind === "heap-tree") {
+      // Heap operations reshuffle values across positions -- there's no
+      // stable per-node identity to diff/animate, so just redraw.
+      renderHeapTree(shape.body, value);
       zone.rendered[name] = { kind };
       return;
     }

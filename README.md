@@ -20,10 +20,16 @@ replays that list of snapshots. Nothing is hardcoded to a specific
 problem's variable names, the same engine renders whatever *you* name:
 
 - A list named `stack` (or anything with "stack" in it) renders as a LIFO
-  tower of blocks, with an empty-state icon before anything's pushed.
+  tower of blocks, with an empty-state icon before anything's pushed. A
+  list named `heap` (a `heapq` list *is* a binary tree — index `i`'s
+  children live at `2i+1`/`2i+2`, just encoded implicitly instead of with
+  real node objects) renders as that tree, redrawn fresh each step since
+  heap operations reshuffle values across positions rather than move a
+  stable node around.
 - Any other list renders as a single rectangle divided into cells — a
-  `dict` (including a `sortedcontainers.SortedDict`) renders as a live
-  sorted key/value strip.
+  `dict` (including a `sortedcontainers.SortedDict` or `collections.Counter`)
+  renders as a live key/value strip, in sorted order for the former and
+  insertion order for the latter.
 - Any object shaped like a singly-linked-list node (a `.next`, plus a
   `.val` or `.value` — whatever your own class is named) renders as a
   chain of separate rounded nodes joined by arrows, distinct from an

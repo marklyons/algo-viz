@@ -328,6 +328,33 @@ select {
    stacked as their own rows inside one shape */
 .linked-list-group { display: flex; flex-direction: column; gap: 10px; }
 
+/* a heapq list, drawn as the binary tree it actually is (child i lives at
+   2i+1/2i+2) rather than an opaque flat array -- name-detected the same
+   way a `stack` list is */
+.heap-tree { display: flex; }
+.heap-tree-svg { overflow: visible; }
+.heap-node-rect { fill: var(--paper); stroke: var(--ink); stroke-width: 1.5; }
+.heap-node-rect.heap-root { stroke: var(--accent); stroke-width: 2; }
+.heap-node-text {
+  font-family: var(--mono);
+  font-size: 12px;
+  fill: var(--ink);
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+.heap-edge { stroke: var(--ink-faint); stroke-width: 1.5; }
+.heap-tree-placeholder {
+  width: 36.5px;
+  height: 36.5px;
+  border: 1.5px dashed var(--ink-faint);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-faint);
+}
+
 .cell.cell-enter { opacity: 0; }
 .stack-shape .cell.cell-enter { transform: translateY(-16px) scale(0.85); }
 .array-shape .cell.cell-enter { transform: translateX(14px) scale(0.85); }
