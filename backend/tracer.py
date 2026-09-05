@@ -51,11 +51,48 @@ def _safe_value(value, depth=0):
     if isinstance(value, set):
         items = list(value)[:MAX_REPR_ITEMS]
         return {"__set__": [_safe_value(v, depth + 1) for v in items]}
+    node_value_attr = _linked_list_value_attr(value)
+    if node_value_attr is not None:
+        # Duck-typed linked-list node (a LeetCode-style ListNode: whatever
+        # a solution names its own class, this matches on shape --
+        # `.val`/`.value` plus `.next` -- not a specific class). Walk the
+        # chain into a plain array of values so the frontend can render it
+        # as a connected sequence of nodes without knowing anything about
+        # the user's class.
+        return {"__kind__": "linked_list", "values": _walk_linked_list(value, node_value_attr, depth)}
     # Fallback for anything else (custom objects, functions, modules, etc.)
     try:
         return repr(value)
     except Exception:
         return "<unrepr-able>"
+
+
+def _linked_list_value_attr(value):
+    """Returns 'val' or 'value' if `value` looks like a singly-linked-list
+    node (has a `.next` and one of those two value attributes), else None.
+    """
+    if isinstance(value, (list, tuple, dict, set, str, int, float, bool)) or value is None:
+        return None
+    if not hasattr(value, "next"):
+        return None
+    if hasattr(value, "val"):
+        return "val"
+    if hasattr(value, "value"):
+        return "value"
+    return None
+
+
+def _walk_linked_list(node, value_attr, depth):
+    values = []
+    seen = set()
+    while node is not None and len(values) < MAX_REPR_ITEMS:
+        if id(node) in seen:
+            values.append("<cycle>")
+            break
+        seen.add(id(node))
+        values.append(_safe_value(getattr(node, value_attr, None), depth + 1))
+        node = getattr(node, "next", None)
+    return values
 
 
 def _snapshot_locals(frame):
@@ -79,11 +116,19 @@ def _snapshot_locals(frame):
     return snap
 
 
-def trace_function_call(source_code, func_name, call_args, arg_names=None):
+def trace_function_call(source_code, func_name, call_args, arg_names=None, build_args_code=None):
     """
     Exec `source_code` to define functions/classes, then call
     `func_name(*call_args)`, recording a step for every executed line
     of every user-defined function (not stdlib internals).
+
+    `build_args_code`, if given, is a snippet defining `build_args(raw_args)`
+    that's exec'd in the *same* namespace as the solution (so it can see
+    classes the solution defines, e.g. a `ListNode`) and used to turn plain
+    JSON test data into the real objects the function expects -- e.g.
+    turning `[[1,4,5],[1,3,4]]` into actual linked-list heads before
+    calling a `mergeKLists(lists)`. Problems that don't need this (anything
+    taking plain ints/strings/arrays) just omit it.
 
     Returns dict: {
         "steps": [ {line, func, event, locals, depth}, ... ],
@@ -186,13 +231,25 @@ def trace_function_call(source_code, func_name, call_args, arg_names=None):
 
         target = namespace[func_name]
         target_code_holder["code"] = target.__code__
+
+        actual_args = call_args
+        if build_args_code:
+            exec(compile(build_args_code, "<build_args>", "exec"), namespace)
+            actual_args = namespace["build_args"](call_args)
+
         sys.settrace(global_tracer)
         try:
             with contextlib.redirect_stdout(stdout_buf):
-                result = target(*call_args)
+                result = target(*actual_args)
         finally:
             sys.settrace(None)
         result = _safe_value(result)
+        if isinstance(result, dict) and result.get("__kind__") == "linked_list":
+            # Keep the top-level result plain (a bare array) so a problem's
+            # `expected` in tests can just be a normal list -- the richer
+            # {__kind__, values} shape is still what shows up inside each
+            # step's locals, which is what the frontend actually renders.
+            result = result["values"]
     except TraceLimitExceeded as e:
         sys.settrace(None)
         error = {"message": str(e), "line": steps[-1]["line"] if steps else None}

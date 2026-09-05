@@ -7,7 +7,7 @@ it, live. No canned animations, no problem-specific scripting. Built to
 double as a clean recording surface for LeetCode explainer videos (the
 scrubber is your video timeline).
 
-![algo-viz stepping through a sorted-map solution to Odd Even Jump, with a loop box and index connectors](docs/screenshot.png)
+![algo-viz stepping through Merge k Sorted Lists: linked-list chains, a heap, a loop box, and an index connector](docs/screenshot.png)
 
 ## How it works
 
@@ -21,6 +21,12 @@ problem's variable names, the same engine renders whatever *you* name:
 - Any other list renders as a single rectangle divided into cells — a
   `dict` (including a `sortedcontainers.SortedDict`) renders as a live
   sorted key/value strip.
+- Any object shaped like a singly-linked-list node (a `.next`, plus a
+  `.val` or `.value` — whatever your own class is named) renders as a
+  chain of separate rounded nodes joined by arrows, distinct from an
+  array's shared-border rectangle since these are genuinely separate
+  objects linked by pointers. A parameter that's a *list* of such nodes
+  (`lists: List[Optional[ListNode]]`) renders as several parallel chains.
 - A `for`/`while` loop gets its own dashed container that appears only
   while execution is actually inside it, holding a small "what will this
   run through" preview (the real sequence for a `for x in some_list:`, the
@@ -85,8 +91,9 @@ algo-viz/
 │   ├── server.py            Flask app: serves the frontend + two JSON endpoints
 │   ├── tracer.py            the execution engine — sys.settrace + AST loop analysis
 │   └── problems/
-│       ├── exclusive_time.py    LeetCode 636
-│       └── odd_even_jump.py     LeetCode 975
+│       ├── exclusive_time.py         LeetCode 636
+│       ├── odd_even_jump.py          LeetCode 975
+│       └── merge_k_sorted_lists.py   LeetCode 23
 ├── frontend/
 │   ├── index.html
 │   ├── app.js                the canvas renderer, drag/snap, loop + connector logic
@@ -108,9 +115,21 @@ Drop a new file in `backend/problems/`, e.g.
 `backend/problems/valid_parentheses.py`, exporting a `PROBLEM` dict shaped
 like the one in `exclusive_time.py` (`id`, `title`, `leetcode_url`,
 `func_name`, `arg_names`, `description`, `starter_code`, `tests`). It shows
-up in the problem dropdown automatically — the array/stack/map/scalar/loop
-rendering is fully generic, so no frontend changes are needed unless a
-problem needs a genuinely new representation (a tree or graph, say).
+up in the problem dropdown automatically — the array/stack/map/scalar/loop/
+linked-list rendering is fully generic, so no frontend changes are needed
+unless a problem needs a genuinely new representation (a tree or graph,
+say).
+
+If the parameters aren't plain JSON-shaped (a linked-list head, say), add
+`build_args_code` to the PROBLEM dict: a string defining `build_args(raw_args)`
+that turns the plain-JSON test data into the real objects the function
+expects. It's exec'd in the *same* namespace as the submitted solution, so
+it can reference classes the solution defines (see
+`merge_k_sorted_lists.py`, which builds `ListNode` chains this way — this
+also means editing the solution's own class definition changes what
+`build_args` sees, since it's the same code both use). The given-bar and
+test editing still work on the plain JSON underneath; only the actual
+function call gets the built version.
 
 ## Notes / current limits
 
@@ -122,6 +141,12 @@ problem needs a genuinely new representation (a tree or graph, say).
 - The loop → array index connector only fires for a `for` loop with a
   simple index variable (`for i in ...`), not a tuple target
   (`for k, v in ...`) or a `while` loop.
+- A variable's "home" (outer scope, or which loop it belongs to) is fixed
+  the first time it's ever bound. If the same name is bound again later
+  inside a *different* loop (e.g. a `for` loop's index variable reused via
+  tuple-unpacking inside a later, sibling `while` loop), it keeps showing
+  only in its original loop's box, not the second one, even though it's
+  live there too.
 - Execution is capped at 20,000 traced steps / 5 seconds, to guard against
   an infinite loop in whatever you paste in.
 - This is a local, single-user tool — the Flask dev server runs with the

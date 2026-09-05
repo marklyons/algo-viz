@@ -238,13 +238,22 @@
       const cell = item?.querySelectorAll(".array-cell")[idx];
       return cell || null;
     }
-    if (mainZone.shapes[name]?.kind === "array") {
-      return mainZone.shapes[name].cells[idx]?.cell || null;
-    }
-    for (const zone of Object.values(state.loopZones)) {
-      if (zone.shapes[name]?.kind === "array") {
-        return zone.shapes[name].cells[idx]?.cell || null;
+    const cellFromShape = (shape) => {
+      if (!shape) return null;
+      if (shape.kind === "array") return shape.cells[idx]?.cell || null;
+      if (shape.kind === "linked-list-group") {
+        // `heads[i]` here means "the i-th chain" -- point at its first
+        // node (or its empty placeholder, which is still a `.cell`).
+        const row = shape.body.children[idx];
+        return row ? row.querySelector(".cell") : null;
       }
+      return null;
+    };
+    const fromMain = cellFromShape(mainZone.shapes[name]);
+    if (fromMain) return fromMain;
+    for (const zone of Object.values(state.loopZones)) {
+      const found = cellFromShape(zone.shapes[name]);
+      if (found) return found;
     }
     return null;
   }
@@ -447,7 +456,7 @@
     const resp = await fetch("/api/run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: cm.getValue(), func_name: state.problem.func_name, args: state.currentArgs }),
+      body: JSON.stringify({ code: cm.getValue(), func_name: state.problem.func_name, args: state.currentArgs, problem_id: state.problem.id }),
     }).then(r => r.json());
 
     resetCanvasState();
@@ -561,8 +570,19 @@
     return pos;
   }
 
+  function isLinkedListNode(v) {
+    return !!v && typeof v === "object" && v.__kind__ === "linked_list";
+  }
+
   function classify(name, value) {
+    if (isLinkedListNode(value)) return "linked-list";
     if (Array.isArray(value)) {
+      // A `lists: List[Optional[ListNode]]` style parameter -- every
+      // present entry is itself a linked-list head -- renders as several
+      // parallel chains rather than one row of opaque bracketed cells.
+      if (value.length > 0 && value.every(v => v === null || isLinkedListNode(v))) {
+        return "linked-list-group";
+      }
       return name.toLowerCase().includes("stack") ? "stack" : "array";
     }
     if (value !== null && typeof value === "object") return "map";
@@ -574,6 +594,7 @@
   function sizeOf(kind, value) {
     if (kind === "scalar") return formatValue(value).length;
     if (kind === "map") return Object.keys(value).length;
+    if (kind === "linked-list") return value.values.length;
     return value.length;
   }
 
@@ -581,6 +602,7 @@
     if (v === null || v === undefined) return "None";
     if (typeof v === "boolean") return v ? "True" : "False";
     if (Array.isArray(v)) return "[" + v.map(formatValue).join(",") + "]";
+    if (isLinkedListNode(v)) return "[" + v.values.map(formatValue).join(",") + "]";
     if (typeof v === "object") return JSON.stringify(v);
     return String(v);
   }
@@ -677,6 +699,17 @@
       if (text !== "True" && text !== "False") return { ok: false };
       return { ok: true, value: text === "True" };
     }
+    if (Array.isArray(original)) {
+      // e.g. one entry of a `lists: List[List[int]]`-shaped param, shown
+      // as bracketed text ("[1,4,5]") in a single given-bar cell -- accept
+      // edited JSON array text back, rather than storing the raw string.
+      try {
+        const parsed = JSON.parse(text);
+        return Array.isArray(parsed) ? { ok: true, value: parsed } : { ok: false };
+      } catch {
+        return { ok: false };
+      }
+    }
     return { ok: true, value: text };
   }
 
@@ -741,6 +774,14 @@
     if (typeof locals[token] === "number") return locals[token];
     const idx = (state.problem.arg_names || []).indexOf(token);
     if (idx !== -1 && typeof state.currentArgs[idx] === "number") return state.currentArgs[idx];
+    const lenMatch = token.match(/^len\((\w+)\)$/);
+    if (lenMatch) {
+      const name = lenMatch[1];
+      if (Array.isArray(locals[name])) return locals[name].length;
+      const argIdx = (state.problem.arg_names || []).indexOf(name);
+      if (argIdx !== -1 && Array.isArray(state.currentArgs[argIdx])) return state.currentArgs[argIdx].length;
+      return null;
+    }
     const m = token.match(/^(\w+)\s*([+-])\s*(\d+)$/);
     if (m) {
       const base = resolveExprNumber(m[1], locals);
@@ -766,7 +807,9 @@
       const idx = (state.problem.arg_names || []).indexOf(expr);
       if (idx !== -1 && Array.isArray(state.currentArgs[idx])) return { type: "array", items: state.currentArgs[idx] };
     }
-    const rangeMatch = expr.match(/^range\(([^)]*)\)$/);
+    // Greedy `.*`, not `[^)]*` -- an argument like `len(heads)` has its own
+    // closing paren, which a non-greedy/exclusive match would stop at.
+    const rangeMatch = expr.match(/^range\((.*)\)$/);
     if (rangeMatch) {
       const parts = rangeMatch[1].split(",").map(s => s.trim()).filter(s => s.length);
       let start = 0, stop = null, step = 1;
@@ -927,17 +970,24 @@
     wrap.appendChild(caption);
 
     let body, cellRefs = null, stackBody = null, placeholderEl = null, cellsByKey = null;
-    if (kind === "stack") {
+    if (kind === "stack" || kind === "linked-list") {
+      // Same shape either way: a placeholder icon while empty, or a live
+      // row of cells once there's something to show. A linked list is
+      // just a stack's sibling here -- a sequence of nodes -- rendered
+      // with rounded pills + arrows instead of a squared-off tower.
+      const items = kind === "linked-list" ? value.values : value;
+      const makeNode = kind === "linked-list" ? makeLinkedNode : makeCell;
       body = document.createElement("div");
-      body.className = "stack-outer";
+      body.className = kind === "linked-list" ? "linked-list-outer" : "stack-outer";
       placeholderEl = document.createElement("div");
-      placeholderEl.className = "stack-placeholder";
-      placeholderEl.innerHTML = STACK_ICON_SVG;
+      placeholderEl.className = kind === "linked-list" ? "linked-list-placeholder" : "stack-placeholder";
+      if (kind === "linked-list") placeholderEl.textContent = "∅";
+      else placeholderEl.innerHTML = STACK_ICON_SVG;
       stackBody = document.createElement("div");
-      stackBody.className = "stack-body";
-      cellRefs = value.map(v => makeCell(stackBody, v));
-      placeholderEl.classList.toggle("hidden", value.length > 0);
-      stackBody.classList.toggle("hidden", value.length === 0);
+      stackBody.className = kind === "linked-list" ? "linked-list-row" : "stack-body";
+      cellRefs = items.map(v => makeNode(stackBody, v));
+      placeholderEl.classList.toggle("hidden", items.length > 0);
+      stackBody.classList.toggle("hidden", items.length === 0);
       body.appendChild(placeholderEl);
       body.appendChild(stackBody);
     } else if (kind === "array") {
@@ -953,6 +1003,10 @@
         body.appendChild(ref.wrap);
         cellsByKey[key] = ref;
       }
+    } else if (kind === "linked-list-group") {
+      body = document.createElement("div");
+      body.className = "linked-list-group";
+      renderLinkedListGroupRows(body, value);
     } else {
       body = document.createElement("div");
       body.className = "scalar-value";
@@ -968,6 +1022,46 @@
     cell.textContent = formatValue(value);
     container.appendChild(cell);
     return cell;
+  }
+
+  // A linked-list node: a rounded pill (distinct from an array's shared-
+  // border rectangle, since these are separate objects joined by pointers,
+  // not one contiguous block). The arrow between nodes is pure CSS
+  // (`:not(:first-child)::before`), so add/remove diffing needs no extra
+  // bookkeeping to keep the arrows in sync.
+  function makeLinkedNode(container, value) {
+    const cell = document.createElement("div");
+    cell.className = "cell linked-node";
+    cell.textContent = formatValue(value);
+    container.appendChild(cell);
+    return cell;
+  }
+
+  // A `lists: List[Optional[ListNode]]`-style parameter: one row per list,
+  // each its own little chain. Rebuilt from scratch on every update rather
+  // than diffed -- k stays fixed for this problem shape, so the only thing
+  // moving is each row's own length, and a full rebuild keeps this simple.
+  function renderLinkedListGroupRows(container, headsArray) {
+    container.innerHTML = "";
+    headsArray.forEach(headVal => {
+      const row = document.createElement("div");
+      row.className = "linked-list-row";
+      const values = isLinkedListNode(headVal) ? headVal.values : [];
+      if (values.length === 0) {
+        const ph = document.createElement("div");
+        ph.className = "cell linked-node linked-node-empty";
+        ph.textContent = "∅";
+        row.appendChild(ph);
+      } else {
+        values.forEach(v => {
+          const node = document.createElement("div");
+          node.className = "cell linked-node";
+          node.textContent = formatValue(v);
+          row.appendChild(node);
+        });
+      }
+      container.appendChild(row);
+    });
   }
 
   function makeArrayCell(container, value, idx) {
@@ -1217,11 +1311,21 @@
       return;
     }
 
-    const newCells = value.map(formatValue);
+    if (kind === "linked-list-group") {
+      // k stays fixed for this shape; only each row's own chain changes.
+      // Simplest correct thing is to just redraw every row.
+      renderLinkedListGroupRows(shape.body, value);
+      zone.rendered[name] = { kind };
+      return;
+    }
+
+    const items = kind === "linked-list" ? value.values : value;
+    const newCells = items.map(formatValue);
     const oldCells = prev.cells || [];
 
-    if (kind === "stack") {
-      // remove from the end (top) if shrunk
+    if (kind === "stack" || kind === "linked-list") {
+      const makeNode = kind === "linked-list" ? makeLinkedNode : makeCell;
+      // remove from the end (top / tail) if shrunk
       while (shape.cells.length > newCells.length) {
         const cell = shape.cells.pop();
         scheduleExit(shape, cell);
@@ -1231,14 +1335,14 @@
       for (let idx = 0; idx < overlap; idx++) {
         if (oldCells[idx] !== newCells[idx]) pulseCell(shape.cells[idx], newCells[idx]);
       }
-      // add new ones at the end (top)
+      // add new ones at the end (top / tail)
       for (let idx = shape.cells.length; idx < newCells.length; idx++) {
-        const cell = makeCell(shape.stackBody, value[idx]);
+        const cell = makeNode(shape.stackBody, items[idx]);
         cell.classList.add("cell-enter");
         requestAnimationFrame(() => requestAnimationFrame(() => cell.classList.remove("cell-enter")));
         shape.cells.push(cell);
       }
-      // swap between the empty-state icon and the actual tower of blocks
+      // swap between the empty-state icon and the actual row of blocks
       shape.placeholderEl.classList.toggle("hidden", newCells.length > 0);
       shape.stackBody.classList.toggle("hidden", newCells.length === 0);
     } else {

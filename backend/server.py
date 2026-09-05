@@ -74,16 +74,22 @@ def get_problem(problem_id):
 def run():
     """Trace one execution of `code` and return the step-by-step recording.
 
-    Body: {code, func_name, args}. Also runs static loop analysis on the
-    same source so the frontend can render loop boxes and index connectors
-    without the tracer needing to know anything about loops itself.
+    Body: {code, func_name, args, problem_id}. `problem_id` is used only to
+    look up the problem's optional `build_args_code` (see tracer.py) for
+    problems whose parameters need to be built into real objects -- e.g. a
+    linked-list head -- before the function can actually be called. Also
+    runs static loop analysis on the same source so the frontend can render
+    loop boxes and index connectors without the tracer needing to know
+    anything about loops itself.
     """
     body = request.get_json(force=True)
     code = body.get("code", "")
     func_name = body.get("func_name", "")
     args = body.get("args", [])
+    problem = PROBLEMS.get(body.get("problem_id", ""))
+    build_args_code = problem.get("build_args_code") if problem else None
 
-    result = trace_function_call(code, func_name, args)
+    result = trace_function_call(code, func_name, args, build_args_code=build_args_code)
     result["loops"] = analyze_loops(code)
     return jsonify(result)
 
@@ -104,9 +110,10 @@ def run_tests():
     if not problem:
         return jsonify({"error": "unknown problem"}), 400
 
+    build_args_code = problem.get("build_args_code")
     outcomes = []
     for t in problem["tests"]:
-        r = trace_function_call(code, func_name, t["args"])
+        r = trace_function_call(code, func_name, t["args"], build_args_code=build_args_code)
         passed = (r["error"] is None) and (r["result"] == t["expected"])
         outcomes.append({
             "name": t["name"],
