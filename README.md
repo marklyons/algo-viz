@@ -89,9 +89,10 @@ algo-viz/
 │   ├── server.py            Flask app: serves the frontend + two JSON endpoints
 │   ├── tracer.py            the execution engine — sys.settrace + AST loop analysis
 │   └── problems/
-│       ├── exclusive_time.py         LeetCode 636
-│       ├── odd_even_jump.py          LeetCode 975
-│       └── merge_k_sorted_lists.py   LeetCode 23
+│       ├── exclusive_time.py            LeetCode 636
+│       ├── odd_even_jump.py             LeetCode 975
+│       ├── merge_k_sorted_lists.py      LeetCode 23
+│       └── minimum_window_substring.py  LeetCode 76
 ├── frontend/
 │   ├── index.html
 │   ├── app.js                the canvas renderer, drag/snap, loop + connector logic

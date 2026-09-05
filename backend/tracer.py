@@ -11,6 +11,7 @@ instead of a canned animation.
 import ast
 import copy
 import io
+import math
 import sys
 import time
 import types
@@ -30,7 +31,18 @@ def _safe_value(value, depth=0):
     """Recursively convert a Python value into something JSON-safe."""
     if depth > 6:
         return "..."
-    if value is None or isinstance(value, (bool, int, float)):
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, float) and not math.isfinite(value):
+        # float("inf") is a common, idiomatic sentinel (e.g. "no answer
+        # found yet"), but strict JSON has no token for it -- Python's
+        # json module happily emits the non-standard `Infinity` literal,
+        # which a browser's JSON.parse then rejects outright. Send it as
+        # a plain string instead.
+        if value != value:  # NaN is the only value that isn't equal to itself
+            return "NaN"
+        return "Infinity" if value > 0 else "-Infinity"
+    if isinstance(value, (int, float)):
         return value
     if isinstance(value, str):
         return value if len(value) <= MAX_STR_LEN else value[:MAX_STR_LEN] + "…"
