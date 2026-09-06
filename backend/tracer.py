@@ -363,3 +363,108 @@ def _find_indexed_arrays(loop_node, target_name):
                 seen.add(name)
                 found.append(name)
     return found
+
+
+# Node types with their own scope -- an assignment target inside one of
+# these belongs to *that* scope, not to whatever function/loop happens to
+# textually contain it, so scope analysis must not descend into them.
+_OWN_SCOPE_NODE_TYPES = (
+    ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda,
+    ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp,
+)
+
+
+def _assignment_target_names(target):
+    """Names directly bound by one assignment target: a plain Name, or a
+    Tuple/List of them (for `a, b = ...` / `for a, b in ...`)."""
+    if isinstance(target, ast.Name):
+        return [target.id]
+    if isinstance(target, (ast.Tuple, ast.List)):
+        names = []
+        for elt in target.elts:
+            names.extend(_assignment_target_names(elt))
+        return names
+    return []
+
+
+def _collect_assignment_lines(node):
+    """
+    name -> sorted list of line numbers where it's directly bound, via a
+    plain Assign / AugAssign / AnnAssign / for-target / with-as, anywhere
+    inside `node` -- except inside a nested function, lambda, or
+    comprehension, which have their own scope and shouldn't leak into this
+    one. This is a *static* alternative to guessing scope from when a name
+    first shows up in the trace: that guess breaks the moment a name is
+    reused as a loop variable in a second, later loop (its trace-based
+    "home" stays locked to the first loop forever), where this doesn't --
+    a name assigned in more than one loop's range just belongs to all of
+    them, and one only assigned outside any loop is outer, matching how a
+    running pointer that's initialized once and updated every iteration
+    (like `prev_time` or `tail` in the shipped examples) already behaves.
+    """
+    lines = {}
+
+    def record(names, lineno):
+        for name in names:
+            lines.setdefault(name, []).append(lineno)
+
+    def visit(n, is_root=False):
+        if not is_root and isinstance(n, _OWN_SCOPE_NODE_TYPES):
+            return
+        if isinstance(n, ast.Assign):
+            names = []
+            for t in n.targets:
+                names.extend(_assignment_target_names(t))
+            record(names, n.lineno)
+        elif isinstance(n, ast.AugAssign):
+            record(_assignment_target_names(n.target), n.lineno)
+        elif isinstance(n, ast.AnnAssign) and n.target is not None:
+            record(_assignment_target_names(n.target), n.lineno)
+        elif isinstance(n, (ast.For, ast.AsyncFor)):
+            record(_assignment_target_names(n.target), n.lineno)
+        elif isinstance(n, (ast.With, ast.AsyncWith)):
+            for item in n.items:
+                if item.optional_vars is not None:
+                    record(_assignment_target_names(item.optional_vars), n.lineno)
+        for child in ast.iter_child_nodes(n):
+            visit(child)
+
+    visit(node, is_root=True)
+    return {name: sorted(ls) for name, ls in lines.items()}
+
+
+def analyze_var_scopes(source_code, func_name, loops):
+    """
+    For `func_name`'s own body, decide which local variables are "outer"
+    (assigned somewhere outside every loop -- persists across the whole
+    function, shown outside any loop box even if also updated inside one)
+    versus purely loop-local (every assignment falls inside one or more
+    loops' own line ranges -- shown only while execution is inside one of
+    those loops, and inside *all* of them it's assigned in, if more than
+    one). Returns {name: {"outer": bool, "loops": [loop indices]}}.
+    """
+    try:
+        tree = ast.parse(source_code)
+    except SyntaxError:
+        return {}
+
+    target = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == func_name:
+            target = node
+            break
+    if target is None:
+        return {}
+
+    scopes = {}
+    for name, assign_lines in _collect_assignment_lines(target).items():
+        outer = False
+        loop_indices = set()
+        for line in assign_lines:
+            containing = [i for i, l in enumerate(loops) if l["start_line"] <= line <= l["end_line"]]
+            if containing:
+                loop_indices.update(containing)
+            else:
+                outer = True
+        scopes[name] = {"outer": outer, "loops": [] if outer else sorted(loop_indices)}
+    return scopes

@@ -99,7 +99,8 @@ algo-viz/
 │       ├── odd_even_jump.py                LeetCode 975
 │       ├── merge_k_sorted_lists.py         LeetCode 23
 │       ├── minimum_window_substring.py     LeetCode 76
-│       └── k_closest_points_to_origin.py   LeetCode 973
+│       ├── k_closest_points_to_origin.py   LeetCode 973
+│       └── minimum_cost_to_hire_k_workers.py  LeetCode 857
 ├── frontend/
 │   ├── index.html
 │   ├── app.js                the canvas renderer, drag/snap, loop + connector logic
@@ -148,12 +149,13 @@ function call gets the built version.
 - The loop → array index connector only fires for a `for` loop with a
   simple index variable (`for i in ...`), not a tuple target
   (`for k, v in ...`) or a `while` loop.
-- A variable's "home" (outer scope, or which loop it belongs to) is fixed
-  the first time it's ever bound. If the same name is bound again later
-  inside a *different* loop (e.g. a `for` loop's index variable reused via
-  tuple-unpacking inside a later, sibling `while` loop), it keeps showing
-  only in its original loop's box, not the second one, even though it's
-  live there too.
+- A variable's "home" (outer scope, or which loop(s) it belongs to) comes
+  from a static scan of where it's actually assigned in the source, not
+  from trace order — so a name reused as a loop target in more than one
+  loop (e.g. `q` bound by both `for i, q in enumerate(...)` and a later,
+  separate `for rate, q in pairs`) correctly shows up in every loop that
+  assigns it, instead of getting stuck in whichever one happened to run
+  first.
 - Execution is capped at 20,000 traced steps / 5 seconds, to guard against
   an infinite loop in whatever you paste in.
 - This is a local, single-user tool — the Flask dev server runs with the

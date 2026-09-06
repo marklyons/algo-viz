@@ -15,7 +15,7 @@ import sys
 from flask import Flask, jsonify, request, send_from_directory
 
 sys.path.insert(0, os.path.dirname(__file__))
-from tracer import trace_function_call, analyze_loops  # noqa: E402
+from tracer import trace_function_call, analyze_loops, analyze_var_scopes  # noqa: E402
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.join(os.path.dirname(BASE_DIR), "frontend")
@@ -91,6 +91,7 @@ def run():
 
     result = trace_function_call(code, func_name, args, build_args_code=build_args_code)
     result["loops"] = analyze_loops(code)
+    result["var_scopes"] = analyze_var_scopes(code, func_name, result["loops"])
     return jsonify(result)
 
 

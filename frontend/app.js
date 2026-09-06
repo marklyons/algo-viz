@@ -35,7 +35,8 @@
     // belongs to which (outer scope vs a specific loop), and, per loop, the
     // 0-based iteration index at every step (for the "at a glance" preview)
     loops: [],
-    varScope: {},        // name -> {kind:'outer'} | {kind:'loop', loopIndex}
+    varScopes: {},       // name -> {outer: bool, loops: [loop indices]} -- static, from the backend's AST scan
+    varScope: {},        // name -> {kind:'outer'} | {kind:'loop', loopIndices: [...]}  (derived per-run in precomputeLayout)
     iterIndexAtStep: [],
     loopBoxes: {},        // loopIdx -> { el, track, varsEl }
     loopZones: {},         // loopIdx -> zone, for the vars living inside that loop box
@@ -431,6 +432,7 @@
     state.reservedPos = {};
     state.customPos = {};
     state.loops = [];
+    state.varScopes = {};
     state.varScope = {};
     state.iterIndexAtStep = [];
     state.loopBoxes = {};
@@ -461,6 +463,7 @@
 
     resetCanvasState();
     state.loops = resp.loops || [];
+    state.varScopes = resp.var_scopes || {};
 
     if (resp.error) {
       statusLine.textContent = `line ${resp.error.line ?? "?"}: ${resp.error.message}`;
@@ -916,7 +919,7 @@
     const zone = state.loopZones[loopIdx];
     const varNames = Object.keys(locals).filter(n => {
       const scope = state.varScope[n];
-      return scope && scope.kind === "loop" && scope.loopIndex === loopIdx;
+      return scope && scope.kind === "loop" && scope.loopIndices.includes(loopIdx);
     });
     reconcileZone(zone, locals, varNames);
   }
@@ -1197,10 +1200,15 @@
   // Walk the full trace once to find, per variable, the largest it ever
   // gets and reserve flow-layout space for that size up front. Without
   // this, a stack/array that grows after it's first drawn would grow into
-  // whatever shape the flow layout placed next to it. Also classifies each
-  // variable as outer-scope or belonging to whichever loop's line range it
-  // was first bound inside, and reserves a slot for each loop box the same
-  // way (sized from its own variables' max sizes).
+  // whatever shape the flow layout placed next to it. Each variable's home
+  // (outer scope, or every loop it's assigned inside) comes from the
+  // backend's static AST scan (state.varScopes) rather than trace order —
+  // a name can be a loop target in more than one loop (e.g. reused via
+  // tuple-unpacking across two sibling `for` loops) and should show up in
+  // all of them, which a "first line it's ever seen bound on" heuristic
+  // can't express. This pass just orders things for layout and finds each
+  // variable's max rendered size; a loop box's own slot is sized from its
+  // own variables' max sizes the same way.
   function precomputeLayout() {
     const argNames = new Set(state.problem.arg_names || []);
     const loops = state.loops;
@@ -1211,6 +1219,12 @@
     const varScope = {};
     const maxVal = {};
     const kindOf = {};
+
+    function scopeOf(name) {
+      const info = state.varScopes[name];
+      if (!info || info.outer || !info.loops || !info.loops.length) return { kind: "outer" };
+      return { kind: "loop", loopIndices: info.loops };
+    }
 
     for (let i = 0; i < state.steps.length; i++) {
       const step = state.steps[i];
@@ -1224,21 +1238,10 @@
         }
       }
 
-      // A variable's scope is attributed to the line that actually executed
-      // to bind it (the *previous* step's line), not the line about to run
-      // next (this step's line). Python emits no trace event for blank or
-      // comment-only lines, so a variable assigned right before a loop can
-      // otherwise first appear in the trace at the loop's own header line —
-      // e.g. `prev_time = 0` on the line before `for log in logs:` would
-      // get misattributed to the loop it merely happens to precede.
-      const attribLine = i === 0 ? step.line : state.steps[i - 1].line;
-      const attribChain = findContainingLoopChain(loops, attribLine);
-      const attribInnermost = attribChain.length ? attribChain[attribChain.length - 1] : null;
-
       for (const [name, value] of Object.entries(step.locals || {})) {
         if (name.startsWith("_") || argNames.has(name)) continue;
         if (!(name in varScope)) {
-          varScope[name] = attribInnermost == null ? { kind: "outer" } : { kind: "loop", loopIndex: attribInnermost };
+          varScope[name] = scopeOf(name);
           if (varScope[name].kind === "outer" && !seenTop.has(name)) {
             seenTop.add(name);
             order.push(name);
@@ -1257,7 +1260,9 @@
 
     const loopVarNames = loops.map(() => []);
     for (const [name, scope] of Object.entries(varScope)) {
-      if (scope.kind === "loop") loopVarNames[scope.loopIndex].push(name);
+      if (scope.kind === "loop") {
+        for (const loopIdx of scope.loopIndices) loopVarNames[loopIdx].push(name);
+      }
     }
 
     state.flow = { x: FLOW_MARGIN, y: FLOW_MARGIN, rowH: 0 };
