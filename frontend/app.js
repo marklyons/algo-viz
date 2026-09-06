@@ -787,7 +787,10 @@
       if (argIdx !== -1 && Array.isArray(state.currentArgs[argIdx])) return state.currentArgs[argIdx].length;
       return null;
     }
-    const m = token.match(/^(\w+)\s*([+-])\s*(\d+)$/);
+    // base +/- digit, where base is a bare name or a `len(name)` call —
+    // covers both `n - 2` and the common reverse-iteration idiom
+    // `range(len(arr) - 1, -1, -1)`.
+    const m = token.match(/^(\w+|len\(\w+\))\s*([+-])\s*(\d+)$/);
     if (m) {
       const base = resolveExprNumber(m[1], locals);
       if (base == null) return null;

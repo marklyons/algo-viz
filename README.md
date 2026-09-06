@@ -101,7 +101,8 @@ algo-viz/
 │       ├── minimum_window_substring.py     LeetCode 76
 │       ├── k_closest_points_to_origin.py   LeetCode 973
 │       ├── minimum_cost_to_hire_k_workers.py  LeetCode 857
-│       └── distinct_subsequences.py        LeetCode 115
+│       ├── distinct_subsequences.py        LeetCode 115
+│       └── maximize_distance_to_closest_person.py  LeetCode 849
 ├── frontend/
 │   ├── index.html
 │   ├── app.js                the canvas renderer, drag/snap, loop + connector logic
