@@ -53,13 +53,23 @@ def _safe_value(value, depth=0):
             out.append("...")
         return out
     if isinstance(value, dict):
-        out = {}
+        # Entries as an explicit ordered list, not a plain JSON object --
+        # dict.items() order is meaningful (a SortedDict swept in position
+        # order, a Counter in insertion order, or any dict a solution
+        # deliberately builds in sequence), and a plain object can't
+        # actually carry that: both Flask's jsonify (sorts keys as
+        # strings) and JavaScript's own object semantics (integer-looking
+        # keys always enumerate first, in ascending numeric order, ahead
+        # of every other key) silently reorder it regardless of what the
+        # JSON text says. A tagged {kind, entries: [[key, value], ...]}
+        # side-steps both.
+        entries = []
         for i, (k, v) in enumerate(value.items()):
             if i >= MAX_REPR_ITEMS:
-                out["..."] = "..."
+                entries.append(["...", "..."])
                 break
-            out[str(k)] = _safe_value(v, depth + 1)
-        return out
+            entries.append([str(k), _safe_value(v, depth + 1)])
+        return {"__kind__": "dict", "entries": entries}
     if isinstance(value, set):
         items = list(value)[:MAX_REPR_ITEMS]
         return {"__set__": [_safe_value(v, depth + 1) for v in items]}

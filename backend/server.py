@@ -22,6 +22,15 @@ FRONTEND_DIR = os.path.join(os.path.dirname(BASE_DIR), "frontend")
 PROBLEMS_DIR = os.path.join(BASE_DIR, "problems")
 
 app = Flask(__name__, static_folder=None)
+# Flask's jsonify sorts dict keys alphabetically as strings by default,
+# which silently scrambles anything where key order carries meaning -- a
+# SortedDict swept in position order, a Counter in insertion order, even a
+# plain dict a solution builds in a deliberate sequence. `_safe_value`
+# (tracer.py) already puts dict keys in exactly the order we want the
+# frontend to see; don't let jsonify re-sort them into lexicographic order
+# behind our backs (e.g. "-5" sorting after "-1" as strings, even though
+# -5 < -1 numerically).
+app.json.sort_keys = False
 
 
 def _load_problems():

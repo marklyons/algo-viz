@@ -577,6 +577,13 @@
     return !!v && typeof v === "object" && v.__kind__ === "linked_list";
   }
 
+  // A dict comes over the wire as {__kind__: "dict", entries: [[key, val],
+  // ...]}, not a plain JSON object -- see the comment in tracer.py's
+  // _safe_value for why a plain object can't carry meaningful key order.
+  function isMapValue(v) {
+    return !!v && typeof v === "object" && v.__kind__ === "dict";
+  }
+
   function classify(name, value) {
     if (isLinkedListNode(value)) return "linked-list";
     if (Array.isArray(value)) {
@@ -590,7 +597,7 @@
       if (lower.includes("heap")) return "heap-tree";
       return lower.includes("stack") ? "stack" : "array";
     }
-    if (value !== null && typeof value === "object") return "map";
+    if (isMapValue(value)) return "map";
     return "scalar";
   }
 
@@ -598,7 +605,7 @@
   // unified across kinds so precomputeLayout doesn't need per-kind branches.
   function sizeOf(kind, value) {
     if (kind === "scalar") return formatValue(value).length;
-    if (kind === "map") return Object.keys(value).length;
+    if (kind === "map") return value.entries.length;
     if (kind === "linked-list") return value.values.length;
     return value.length;
   }
@@ -608,6 +615,7 @@
     if (typeof v === "boolean") return v ? "True" : "False";
     if (Array.isArray(v)) return "[" + v.map(formatValue).join(",") + "]";
     if (isLinkedListNode(v)) return "[" + v.values.map(formatValue).join(",") + "]";
+    if (isMapValue(v)) return "{" + v.entries.map(([k, val]) => `${k}:${formatValue(val)}`).join(",") + "}";
     if (typeof v === "object") return JSON.stringify(v);
     return String(v);
   }
@@ -1006,7 +1014,7 @@
       body = document.createElement("div");
       body.className = "map-row";
       cellsByKey = {};
-      for (const [key, v] of Object.entries(value)) {
+      for (const [key, v] of value.entries) {
         const ref = makeMapCell(key, v);
         body.appendChild(ref.wrap);
         cellsByKey[key] = ref;
@@ -1366,14 +1374,14 @@
       // key just overwrites, it doesn't move) — so this diffs by key and
       // positions each cell explicitly, rather than reusing the array/
       // stack tail-diff below.
-      const newKeys = new Set(Object.keys(value));
+      const newKeys = new Set(value.entries.map(([key]) => key));
       for (const key of Object.keys(shape.cellsByKey)) {
         if (!newKeys.has(key)) {
           scheduleExit(shape, shape.cellsByKey[key].wrap);
           delete shape.cellsByKey[key];
         }
       }
-      Object.entries(value).forEach(([key, val], idx) => {
+      value.entries.forEach(([key, val], idx) => {
         const referenceNode = shape.body.children[idx] || null;
         let ref = shape.cellsByKey[key];
         if (!ref) {
