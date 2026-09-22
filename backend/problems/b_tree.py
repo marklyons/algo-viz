@@ -4,7 +4,7 @@ CS Fundamentals - Populate a B-Tree
 Not a LeetCode problem: a from-scratch data-structure demo alongside
 "Build a Balanced BST" in the "CS Fundamentals & Data Structures"
 section. Unlike a binary tree, a B-tree node holds several keys at once
-(up to 2t-1, here t=3 so up to 5) and fans out to that many+1 children --
+(up to 2t-1, here t=2 so up to 3) and fans out to that many+1 children --
 the point of this demo is watching *why* a node splits: insert keys one
 at a time, and once a node would overflow past 2t-1 keys, its middle key
 gets pushed up into the parent and the node splits in two. That's what
@@ -27,7 +27,7 @@ class _RefNode:
         self.leaf = leaf
 
 
-_REF_T = 3
+_REF_T = 2
 
 
 def _ref_split_child(parent, i):
@@ -100,8 +100,8 @@ PROBLEM = {
     "arg_names": ["values"],
     "description": (
         "Insert values one at a time into a B-tree of minimum degree "
-        "t=3 (each node holds up to 2t-1=5 keys and up to 2t=6 "
-        "children). Once a node would overflow past 5 keys, its middle "
+        "t=2 (each node holds up to 2t-1=3 keys and up to 2t=4 "
+        "children). Once a node would overflow past 3 keys, its middle "
         "key is pushed up into the parent and the node splits into two "
         "-- watch the tree grow and occasionally gain a level as that "
         "happens. Try the 1000-key test to see a full-size tree; "
@@ -114,7 +114,7 @@ PROBLEM = {
         self.leaf = leaf
 
 
-T = 3  # minimum degree: max 2T-1=5 keys, max 2T=6 children per node
+T = 2  # minimum degree: max 2T-1=3 keys, max 2T=4 children per node
 
 
 def splitChild(parent, i):
