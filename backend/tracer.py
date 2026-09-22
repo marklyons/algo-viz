@@ -239,6 +239,18 @@ def _walk_btree(root):
     return nodes
 
 
+def _is_duck_typed_node(value):
+    """True for any of the linked-list/tree/B-tree shapes _safe_value
+    special-cases below. See the comment in _snapshot_locals on why that
+    matters for the deepcopy this skips.
+    """
+    return (
+        _linked_list_value_attr(value) is not None
+        or _tree_child_attrs(value) is not None
+        or _is_btree_node(value)
+    )
+
+
 def _snapshot_locals(frame):
     snap = {}
     for name, value in frame.f_locals.items():
@@ -251,7 +263,21 @@ def _snapshot_locals(frame):
             # showing its repr ("<function ... at 0x...>") is just noise.
             continue
         try:
-            snap[name] = _safe_value(copy.deepcopy(value))
+            if _is_duck_typed_node(value):
+                # These get walked into a brand-new JSON-safe structure by
+                # _safe_value itself (only immutable leaf values -- ints,
+                # strings -- ever get referenced from the live object), so
+                # deepcopy-ing first would just be copying a potentially
+                # large live object graph for no benefit. This matters a
+                # lot for something like a B-tree built by repeated
+                # in-place insertion: the same growing root object is a
+                # live local across every one of hundreds of top-level
+                # steps, and Python's generic (non-list/dict) deepcopy
+                # path is slow enough per node that copying it at every
+                # one of those steps becomes the dominant tracing cost.
+                snap[name] = _safe_value(value)
+            else:
+                snap[name] = _safe_value(copy.deepcopy(value))
         except Exception:
             try:
                 snap[name] = _safe_value(value)
