@@ -172,6 +172,13 @@ def buildBTree(values):
             "expected": _flatten(_ref_build([0, 1, 2, 3, 4, 5, 6])),
         },
         {
+            "name": "16 keys (unsorted)",
+            "args": [[20, 40, 10, 30, 33, 50, 60, 5, 15, 25, 18, 31, 35, 45, 55, 65]],
+            "expected": _flatten(_ref_build(
+                [20, 40, 10, 30, 33, 50, 60, 5, 15, 25, 18, 31, 35, 45, 55, 65]
+            )),
+        },
+        {
             "name": "100 keys",
             "args": [list(range(100))],
             "expected": _flatten(_ref_build(list(range(100)))),
