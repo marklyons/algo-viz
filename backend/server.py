@@ -64,9 +64,20 @@ def static_files(path):
 
 @app.route("/api/problems")
 def list_problems():
-    """Lightweight list for the problem picker: id + title only."""
+    """Lightweight list for the problem picker: id + title + category.
+
+    `category` groups the dropdown (e.g. "CS Fundamentals & Data
+    Structures" alongside the LeetCode problems). Existing problem files
+    predate the field, so anything that doesn't set one defaults to
+    "LeetCode Problems" here rather than needing every file touched.
+    """
     return jsonify([
-        {"id": p["id"], "title": p["title"]} for p in PROBLEMS.values()
+        {
+            "id": p["id"],
+            "title": p["title"],
+            "category": p.get("category", "LeetCode Problems"),
+        }
+        for p in PROBLEMS.values()
     ])
 
 

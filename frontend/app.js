@@ -372,20 +372,41 @@
   async function loadProblems() {
     const list = await fetch("/api/problems").then(r => r.json());
     problemSelect.innerHTML = "";
+    // Grouped by category (e.g. "LeetCode Problems" vs "CS Fundamentals &
+    // Data Structures") into <optgroup>s -- "LeetCode Problems" always
+    // first (it's the default/main section; problem files just happen to
+    // load in filename order, which shouldn't silently reshuffle this or
+    // change which problem opens by default), any other categories after
+    // that in the order they're first seen.
+    const groups = new Map();
+    const LEETCODE_CAT = "LeetCode Problems";
+    groups.set(LEETCODE_CAT, document.createElement("optgroup"));
     for (const p of list) {
+      const cat = p.category || LEETCODE_CAT;
+      if (!groups.has(cat)) groups.set(cat, document.createElement("optgroup"));
       const opt = document.createElement("option");
       opt.value = p.id;
       opt.textContent = p.title;
-      problemSelect.appendChild(opt);
+      groups.get(cat).appendChild(opt);
     }
-    if (list.length) await loadProblem(list[0].id);
+    let firstId = null;
+    for (const [cat, group] of groups) {
+      if (!group.children.length) continue; // the LeetCode placeholder, if somehow empty
+      group.label = cat;
+      problemSelect.appendChild(group);
+      if (firstId === null) firstId = group.querySelector("option").value;
+    }
+    if (firstId) await loadProblem(firstId);
   }
 
   async function loadProblem(id) {
     const p = await fetch(`/api/problems/${id}`).then(r => r.json());
     state.problem = p;
     problemSelect.value = id;
-    leetcodeLink.href = p.leetcode_url;
+    // Not every problem is a LeetCode one (e.g. the CS Fundamentals
+    // section) -- hide the link rather than pointing it at "undefined".
+    leetcodeLink.classList.toggle("hidden", !p.leetcode_url);
+    leetcodeLink.href = p.leetcode_url || "#";
     const stored = loadStoredCode(id);
     cm.setValue(stored != null ? stored : p.starter_code);
 
