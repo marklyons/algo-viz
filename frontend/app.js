@@ -590,7 +590,11 @@
       // A `lists: List[Optional[ListNode]]` style parameter -- every
       // present entry is itself a linked-list head -- renders as several
       // parallel chains rather than one row of opaque bracketed cells.
-      if (value.length > 0 && value.every(v => v === null || isLinkedListNode(v))) {
+      // Requires at least one actual node so a plain array that's simply
+      // all-None right now (e.g. `higher = [None] * n` before it's filled
+      // in) doesn't vacuously satisfy "every entry is null-or-a-node" and
+      // get stuck rendering as an empty linked-list forever.
+      if (value.length > 0 && value.some(isLinkedListNode) && value.every(v => v === null || isLinkedListNode(v))) {
         return "linked-list-group";
       }
       const lower = name.toLowerCase();
