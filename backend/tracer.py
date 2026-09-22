@@ -21,6 +21,7 @@ MAX_STEPS = 20000
 MAX_SECONDS = 5.0
 MAX_REPR_ITEMS = 500
 MAX_STR_LEN = 2000
+MAX_TREE_NODES = 2000
 
 
 class TraceLimitExceeded(Exception):
@@ -82,6 +83,15 @@ def _safe_value(value, depth=0):
         # as a connected sequence of nodes without knowing anything about
         # the user's class.
         return {"__kind__": "linked_list", "values": _walk_linked_list(value, node_value_attr, depth)}
+    tree_value_attr = _tree_child_attrs(value)
+    if tree_value_attr is not None:
+        # Duck-typed binary-tree node (`.val`/`.value` plus `.left` and
+        # `.right`). Flattened into an index-based node list rather than
+        # nested dicts mirroring the real object graph -- a balanced
+        # 1000-node tree is ~10 levels deep, well past the depth>6 cutoff
+        # below meant to bound accidental *generic* deep nesting, and a
+        # flat list also sidesteps ever needing to worry about it.
+        return {"__kind__": "tree", "nodes": _walk_tree(value, tree_value_attr)}
     # Fallback for anything else (custom objects, functions, modules, etc.)
     try:
         return repr(value)
@@ -115,6 +125,63 @@ def _walk_linked_list(node, value_attr, depth):
         values.append(_safe_value(getattr(node, value_attr, None), depth + 1))
         node = getattr(node, "next", None)
     return values
+
+
+def _tree_child_attrs(value):
+    """Returns 'val' or 'value' if `value` looks like a binary-tree node
+    (has both `.left` and `.right`, plus one of the two value attributes),
+    else None. Checked after the linked-list shape, so a node that
+    happens to satisfy both duck-types still renders as whichever it
+    actually is -- a plain node only ever has one of `.next` or
+    `.left`/`.right` in practice.
+    """
+    if isinstance(value, (list, tuple, dict, set, str, int, float, bool)) or value is None:
+        return None
+    if not (hasattr(value, "left") and hasattr(value, "right")):
+        return None
+    if hasattr(value, "val"):
+        return "val"
+    if hasattr(value, "value"):
+        return "value"
+    return None
+
+
+def _walk_tree(root, value_attr):
+    """Flattens a binary tree into a BFS-ordered node list: each entry is
+    {"val", "left", "right"} where left/right are indices into that same
+    list, or None. Iterative and id-keyed (not recursive through
+    `_safe_value`), so neither tree height nor a cycle can blow it up --
+    a node already seen just gets its existing index reused.
+    """
+    index_of = {id(root): 0}
+    queue = [root]
+    nodes = []
+    i = 0
+    while i < len(queue):
+        node = queue[i]
+        i += 1
+        if len(nodes) >= MAX_TREE_NODES:
+            nodes.append({"val": "...", "left": None, "right": None})
+            break
+        left = getattr(node, "left", None)
+        right = getattr(node, "right", None)
+        left_idx = right_idx = None
+        if left is not None:
+            if id(left) not in index_of:
+                index_of[id(left)] = len(queue)
+                queue.append(left)
+            left_idx = index_of[id(left)]
+        if right is not None:
+            if id(right) not in index_of:
+                index_of[id(right)] = len(queue)
+                queue.append(right)
+            right_idx = index_of[id(right)]
+        nodes.append({
+            "val": _safe_value(getattr(node, value_attr, None)),
+            "left": left_idx,
+            "right": right_idx,
+        })
+    return nodes
 
 
 def _snapshot_locals(frame):
@@ -272,6 +339,8 @@ def trace_function_call(source_code, func_name, call_args, arg_names=None, build
             # {__kind__, values} shape is still what shows up inside each
             # step's locals, which is what the frontend actually renders.
             result = result["values"]
+        elif isinstance(result, dict) and result.get("__kind__") == "tree":
+            result = result["nodes"]
     except TraceLimitExceeded as e:
         sys.settrace(None)
         error = {"message": str(e), "line": steps[-1]["line"] if steps else None}

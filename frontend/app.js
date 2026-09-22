@@ -603,6 +603,14 @@
     return !!v && typeof v === "object" && v.__kind__ === "linked_list";
   }
 
+  // A binary-tree node comes over the wire as {__kind__: "tree", nodes:
+  // [{val, left, right}, ...]} -- a flat, BFS-ordered, index-linked list
+  // rather than nested objects mirroring the real pointer graph (see the
+  // comment on tracer.py's _walk_tree for why).
+  function isTreeNode(v) {
+    return !!v && typeof v === "object" && v.__kind__ === "tree";
+  }
+
   // A dict comes over the wire as {__kind__: "dict", entries: [[key, val],
   // ...]}, not a plain JSON object -- see the comment in tracer.py's
   // _safe_value for why a plain object can't carry meaningful key order.
@@ -612,6 +620,7 @@
 
   function classify(name, value) {
     if (isLinkedListNode(value)) return "linked-list";
+    if (isTreeNode(value)) return "tree";
     if (Array.isArray(value)) {
       // A `lists: List[Optional[ListNode]]` style parameter -- every
       // present entry is itself a linked-list head -- renders as several
@@ -637,6 +646,7 @@
     if (kind === "scalar") return formatValue(value).length;
     if (kind === "map") return value.entries.length;
     if (kind === "linked-list") return value.values.length;
+    if (kind === "tree") return value.nodes.length;
     return value.length;
   }
 
@@ -645,6 +655,7 @@
     if (typeof v === "boolean") return v ? "True" : "False";
     if (Array.isArray(v)) return "[" + v.map(formatValue).join(",") + "]";
     if (isLinkedListNode(v)) return "[" + v.values.map(formatValue).join(",") + "]";
+    if (isTreeNode(v)) return `Tree(${v.nodes.length} node${v.nodes.length === 1 ? "" : "s"})`;
     if (isMapValue(v)) return "{" + v.entries.map(([k, val]) => `${k}:${formatValue(val)}`).join(",") + "}";
     if (typeof v === "object") return JSON.stringify(v);
     return String(v);
@@ -1057,6 +1068,10 @@
       body = document.createElement("div");
       body.className = "heap-tree";
       renderHeapTree(body, value);
+    } else if (kind === "tree") {
+      body = document.createElement("div");
+      body.className = "tree";
+      renderTree(body, value);
     } else {
       body = document.createElement("div");
       body.className = "scalar-value";
@@ -1184,6 +1199,96 @@
       text.setAttribute("x", x);
       text.setAttribute("y", y);
       text.setAttribute("class", "heap-node-text");
+      text.textContent = texts[i];
+      svg.appendChild(text);
+    }
+    container.appendChild(svg);
+  }
+
+  const TREE_NODE_R = 14;
+  const TREE_CHAR_W = 7;
+  const TREE_LEVEL_GAP = 46;
+  const TREE_NODE_GAP = 8;
+
+  // A real binary tree (explicit .left/.right pointers, not a heap's
+  // implicit array-index tree) -- positioned by in-order rank for x (the
+  // natural left-to-right BST reading order, which spaces nodes cleanly
+  // even when the tree isn't perfectly complete) and BFS depth for y.
+  // Can be asked to lay out hundreds of nodes (e.g. a 1000-node balanced
+  // BST demo) -- the canvas is pannable/zoomable for exactly this case;
+  // there's no attempt to keep it legible at the default zoom level.
+  function renderTree(container, treeValue) {
+    container.innerHTML = "";
+    const nodes = treeValue.nodes;
+    const n = nodes.length;
+    if (n === 0) {
+      const ph = document.createElement("div");
+      ph.className = "tree-placeholder";
+      ph.textContent = "∅";
+      container.appendChild(ph);
+      return;
+    }
+
+    const xRank = new Array(n).fill(0);
+    const depthOf = new Array(n).fill(0);
+    let nextX = 0;
+    // Recursion depth here tracks tree height (~log2(n) for a balanced
+    // tree), never node count -- safe even at hundreds of nodes.
+    (function inorder(i, depth) {
+      if (i === null || i === undefined) return;
+      const node = nodes[i];
+      inorder(node.left, depth + 1);
+      xRank[i] = nextX++;
+      depthOf[i] = depth;
+      inorder(node.right, depth + 1);
+    })(0, 0);
+
+    const texts = nodes.map(nd => formatValue(nd.val));
+    let maxCharLen = 1;
+    for (const t of texts) if (t.length > maxCharLen) maxCharLen = t.length;
+    const slotW = Math.max(TREE_NODE_R * 2, maxCharLen * TREE_CHAR_W + 14) + TREE_NODE_GAP;
+    const width = nextX * slotW;
+    let maxDepth = 0;
+    for (const d of depthOf) if (d > maxDepth) maxDepth = d;
+    const height = TREE_NODE_R * 2 + maxDepth * TREE_LEVEL_GAP;
+
+    function posOf(i) {
+      return {
+        x: (xRank[i] + 0.5) * slotW,
+        y: TREE_NODE_R + depthOf[i] * TREE_LEVEL_GAP,
+      };
+    }
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", width);
+    svg.setAttribute("height", height);
+    svg.setAttribute("class", "tree-svg");
+
+    for (let i = 0; i < n; i++) {
+      const node = nodes[i];
+      const p = posOf(i);
+      for (const childIdx of [node.left, node.right]) {
+        if (childIdx === null || childIdx === undefined) continue;
+        const c = posOf(childIdx);
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", p.x); line.setAttribute("y1", p.y);
+        line.setAttribute("x2", c.x); line.setAttribute("y2", c.y);
+        line.setAttribute("class", "tree-edge");
+        svg.appendChild(line);
+      }
+    }
+    for (let i = 0; i < n; i++) {
+      const { x, y } = posOf(i);
+      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      circle.setAttribute("cx", x);
+      circle.setAttribute("cy", y);
+      circle.setAttribute("r", TREE_NODE_R);
+      circle.setAttribute("class", "tree-node-circle" + (i === 0 ? " tree-root" : ""));
+      svg.appendChild(circle);
+      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      text.setAttribute("x", x);
+      text.setAttribute("y", y);
+      text.setAttribute("class", "tree-node-text");
       text.textContent = texts[i];
       svg.appendChild(text);
     }
@@ -1451,6 +1556,15 @@
       // Heap operations reshuffle values across positions -- there's no
       // stable per-node identity to diff/animate, so just redraw.
       renderHeapTree(shape.body, value);
+      zone.rendered[name] = { kind };
+      return;
+    }
+
+    if (kind === "tree") {
+      // Same story as heap-tree: pointers get rewired freely (e.g. a
+      // subtree reassigned to a different parent), so there's no stable
+      // layout to diff/animate -- just redraw.
+      renderTree(shape.body, value);
       zone.rendered[name] = { kind };
       return;
     }

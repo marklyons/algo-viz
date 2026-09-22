@@ -355,6 +355,34 @@ select {
   color: var(--ink-faint);
 }
 
+/* a real binary tree (explicit .left/.right pointers) -- can be asked to
+   lay out hundreds of nodes, so it leans on the canvas's own pan/zoom
+   rather than trying to stay legible at the default zoom level */
+.tree { display: flex; }
+.tree-svg { overflow: visible; }
+.tree-node-circle { fill: var(--paper); stroke: var(--ink); stroke-width: 1.5; }
+.tree-node-circle.tree-root { stroke: var(--accent); stroke-width: 2; }
+.tree-node-text {
+  font-family: var(--mono);
+  font-size: 11px;
+  fill: var(--ink);
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+.tree-edge { stroke: var(--ink-faint); stroke-width: 1.5; }
+.tree-placeholder {
+  width: 36.5px;
+  height: 36.5px;
+  border: 1.5px dashed var(--ink-faint);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-faint);
+}
+
+
 .cell.cell-enter { opacity: 0; }
 .stack-shape .cell.cell-enter { transform: translateY(-16px) scale(0.85); }
 .array-shape .cell.cell-enter { transform: translateX(14px) scale(0.85); }
