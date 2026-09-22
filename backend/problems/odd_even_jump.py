@@ -20,6 +20,12 @@ PROBLEM = {
     # ever sees indices already visited. Kept exactly as submitted (down to
     # the `if(x):` truthiness checks) rather than "fixed" -- the point of
     # this tool is to show you what your own code actually does.
+    #
+    # ceilingAt/floorAt are inlined into the loop body (rather than called
+    # as nested helper functions) so the tracer actually steps through the
+    # bisect_left/bisect_right lookups instead of jumping straight from the
+    # call to its return value -- a nested helper is deliberately stepped
+    # over, not into (see README).
     "starter_code": '''from sortedcontainers import SortedDict
 
 def oddEvenJumps(arr):
@@ -35,23 +41,19 @@ def oddEvenJumps(arr):
     tMap = SortedDict()
     tMap[arr[n - 1]] = n - 1
 
-    def ceilingAt(i):
-        idx = tMap.bisect_left(arr[i])
-        if idx < len(tMap):
-            key = tMap.keys()[idx]
-            return tMap[key]
-        return None
-
-    def floorAt(i):
-        idx = tMap.bisect_right(arr[i]) - 1
-        if idx >= 0:
-            key = tMap.keys()[idx]
-            return tMap[key]
-        return None
-
     for i in range(n - 2, -1, -1):
-        higher_key_val_pair = ceilingAt(i)
-        lower_key_val_pair = floorAt(i)
+        ceiling_idx = tMap.bisect_left(arr[i])
+        higher_key_val_pair = None
+        if ceiling_idx < len(tMap):
+            ceiling_key = tMap.keys()[ceiling_idx]
+            higher_key_val_pair = tMap[ceiling_key]
+
+        floor_idx = tMap.bisect_right(arr[i]) - 1
+        lower_key_val_pair = None
+        if floor_idx >= 0:
+            floor_key = tMap.keys()[floor_idx]
+            lower_key_val_pair = tMap[floor_key]
+
         if(higher_key_val_pair):
             higher[i] = lower[higher_key_val_pair]
         if(lower_key_val_pair):
