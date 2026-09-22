@@ -93,7 +93,12 @@
     const worldX = (cx - pan.x) / scale;
     const worldY = (cy - pan.y) / scale;
     const delta = -e.deltaY * 0.0015;
-    const newScale = Math.min(2.2, Math.max(0.35, scale + delta));
+    // The lower bound used to be 0.35, plenty for the small array/stack/
+    // heap diagrams every other problem draws -- but a several-hundred-
+    // node tree (e.g. the balanced-BST demo) can be tens of thousands of
+    // px wide, and needs to zoom out far further to ever show the whole
+    // shape at once.
+    const newScale = Math.min(2.2, Math.max(0.02, scale + delta));
     pan.x = cx - worldX * newScale;
     pan.y = cy - worldY * newScale;
     scale = newScale;
