@@ -31,6 +31,14 @@ app = Flask(__name__, static_folder=None)
 # behind our backs (e.g. "-5" sorting after "-1" as strings, even though
 # -5 < -1 numerically).
 app.json.sort_keys = False
+# Flask pretty-prints JSON (2-space indent) whenever `app.debug` is on,
+# which this app's dev server always has -- fine for a small response, but
+# a trace can be tens of thousands of steps, so the added whitespace (one
+# line per number in every array) roughly quadruples payload size for
+# something like a 1000-node tree trace. Force compact output regardless
+# of debug mode; nobody's reading these responses by eye anyway, only the
+# frontend's JSON.parse.
+app.json.compact = True
 
 
 def _load_problems():
