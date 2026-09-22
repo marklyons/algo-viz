@@ -95,6 +95,11 @@ def buildBalancedBST(values):
             "expected": _flatten(_ref_build([1, 2, 3, 4, 5, 6, 7])),
         },
         {
+            "name": "100 nodes",
+            "args": [list(range(100))],
+            "expected": _flatten(_ref_build(list(range(100)))),
+        },
+        {
             "name": "1000 nodes",
             "args": [list(range(1000))],
             "expected": _flatten(_ref_build(list(range(1000)))),
