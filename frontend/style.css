@@ -382,6 +382,11 @@ select {
   color: var(--ink-faint);
 }
 
+/* a B-tree node: several keys sharing one rounded box (like a small
+   array), rather than one value per node */
+.btree-node-rect { fill: var(--paper); stroke: var(--ink); stroke-width: 1.5; }
+.btree-node-rect.btree-root { stroke: var(--accent); stroke-width: 2; }
+.btree-key-divider { stroke: var(--ink); stroke-width: 1.5; }
 
 .cell.cell-enter { opacity: 0; }
 .stack-shape .cell.cell-enter { transform: translateY(-16px) scale(0.85); }

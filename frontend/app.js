@@ -611,6 +611,14 @@
     return !!v && typeof v === "object" && v.__kind__ === "tree";
   }
 
+  // A B-tree node comes over the wire as {__kind__: "btree", nodes:
+  // [{keys: [...], children: [...]}, ...]} -- same flat, BFS-ordered,
+  // index-linked shape as a binary tree, generalized from exactly two
+  // children to however many a node has.
+  function isBTreeNode(v) {
+    return !!v && typeof v === "object" && v.__kind__ === "btree";
+  }
+
   // A dict comes over the wire as {__kind__: "dict", entries: [[key, val],
   // ...]}, not a plain JSON object -- see the comment in tracer.py's
   // _safe_value for why a plain object can't carry meaningful key order.
@@ -621,6 +629,7 @@
   function classify(name, value) {
     if (isLinkedListNode(value)) return "linked-list";
     if (isTreeNode(value)) return "tree";
+    if (isBTreeNode(value)) return "btree";
     if (Array.isArray(value)) {
       // A `lists: List[Optional[ListNode]]` style parameter -- every
       // present entry is itself a linked-list head -- renders as several
@@ -646,7 +655,7 @@
     if (kind === "scalar") return formatValue(value).length;
     if (kind === "map") return value.entries.length;
     if (kind === "linked-list") return value.values.length;
-    if (kind === "tree") return value.nodes.length;
+    if (kind === "tree" || kind === "btree") return value.nodes.length;
     return value.length;
   }
 
@@ -656,6 +665,7 @@
     if (Array.isArray(v)) return "[" + v.map(formatValue).join(",") + "]";
     if (isLinkedListNode(v)) return "[" + v.values.map(formatValue).join(",") + "]";
     if (isTreeNode(v)) return `Tree(${v.nodes.length} node${v.nodes.length === 1 ? "" : "s"})`;
+    if (isBTreeNode(v)) return `BTree(${v.nodes.length} node${v.nodes.length === 1 ? "" : "s"})`;
     if (isMapValue(v)) return "{" + v.entries.map(([k, val]) => `${k}:${formatValue(val)}`).join(",") + "}";
     if (typeof v === "object") return JSON.stringify(v);
     return String(v);
@@ -1072,6 +1082,10 @@
       body = document.createElement("div");
       body.className = "tree";
       renderTree(body, value);
+    } else if (kind === "btree") {
+      body = document.createElement("div");
+      body.className = "tree";
+      renderBTree(body, value);
     } else {
       body = document.createElement("div");
       body.className = "scalar-value";
@@ -1291,6 +1305,133 @@
       text.setAttribute("class", "tree-node-text");
       text.textContent = texts[i];
       svg.appendChild(text);
+    }
+    container.appendChild(svg);
+  }
+
+  const BT_KEY_W = 34;
+  const BT_KEY_H = 30;
+  const BT_LEVEL_GAP = 70;
+  const BT_SIBLING_GAP = 16;
+
+  // A B-tree node holds several keys (drawn as a row of cells inside one
+  // rounded box, like a small array) and fans out to keys.length+1
+  // children -- a genuinely different shape from a binary tree's one-
+  // value-per-node, so it gets its own tidy-tree layout: each node's own
+  // box is sized to its key count, and a subtree's width is whichever is
+  // bigger, its own box or its children laid out side by side with a gap
+  // between them (a classic bottom-up "measure then place" tree layout,
+  // not just an in-order key rank like the binary-tree renderer uses,
+  // since a node here is wider than one key-slot).
+  function renderBTree(container, btreeValue) {
+    container.innerHTML = "";
+    const nodes = btreeValue.nodes;
+    const n = nodes.length;
+    if (n === 0) {
+      const ph = document.createElement("div");
+      ph.className = "tree-placeholder";
+      ph.textContent = "∅";
+      container.appendChild(ph);
+      return;
+    }
+
+    const boxWidth = new Array(n).fill(0);
+    const subtreeWidth = new Array(n).fill(0);
+    const depthOf = new Array(n).fill(0);
+
+    function measure(i, depth) {
+      depthOf[i] = depth;
+      const node = nodes[i];
+      boxWidth[i] = Math.max(1, node.keys.length) * BT_KEY_W;
+      const kids = (node.children || []).filter(c => c !== null && c !== undefined);
+      if (kids.length === 0) {
+        subtreeWidth[i] = boxWidth[i];
+        return;
+      }
+      let childrenTotal = (kids.length - 1) * BT_SIBLING_GAP;
+      for (const c of kids) {
+        measure(c, depth + 1);
+        childrenTotal += subtreeWidth[c];
+      }
+      subtreeWidth[i] = Math.max(boxWidth[i], childrenTotal);
+    }
+    measure(0, 0);
+
+    const nodeLeft = new Array(n).fill(0);
+    function place(i, leftEdge) {
+      const node = nodes[i];
+      const kids = (node.children || []).filter(c => c !== null && c !== undefined);
+      if (kids.length === 0) {
+        nodeLeft[i] = leftEdge + (subtreeWidth[i] - boxWidth[i]) / 2;
+        return;
+      }
+      let childrenTotal = (kids.length - 1) * BT_SIBLING_GAP;
+      for (const c of kids) childrenTotal += subtreeWidth[c];
+      let cursor = leftEdge + (subtreeWidth[i] - childrenTotal) / 2;
+      for (const c of kids) {
+        place(c, cursor);
+        cursor += subtreeWidth[c] + BT_SIBLING_GAP;
+      }
+      const first = kids[0], last = kids[kids.length - 1];
+      const span = (nodeLeft[first] + boxWidth[first] / 2 + nodeLeft[last] + boxWidth[last] / 2) / 2;
+      nodeLeft[i] = span - boxWidth[i] / 2;
+    }
+    place(0, 0);
+
+    let maxDepth = 0;
+    for (const d of depthOf) if (d > maxDepth) maxDepth = d;
+    const width = subtreeWidth[0];
+    const height = (maxDepth + 1) * BT_LEVEL_GAP - (BT_LEVEL_GAP - BT_KEY_H);
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", width);
+    svg.setAttribute("height", height);
+    svg.setAttribute("class", "tree-svg");
+
+    // Edges first (so node boxes draw on top of the lines feeding into them).
+    for (let i = 0; i < n; i++) {
+      const node = nodes[i];
+      const kids = node.children || [];
+      const y0 = depthOf[i] * BT_LEVEL_GAP + BT_KEY_H;
+      for (let g = 0; g < kids.length; g++) {
+        const c = kids[g];
+        if (c === null || c === undefined) continue;
+        const x0 = nodeLeft[i] + g * BT_KEY_W;
+        const x1 = nodeLeft[c] + boxWidth[c] / 2;
+        const y1 = depthOf[c] * BT_LEVEL_GAP;
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", x0); line.setAttribute("y1", y0);
+        line.setAttribute("x2", x1); line.setAttribute("y2", y1);
+        line.setAttribute("class", "tree-edge");
+        svg.appendChild(line);
+      }
+    }
+    for (let i = 0; i < n; i++) {
+      const node = nodes[i];
+      const x = nodeLeft[i], y = depthOf[i] * BT_LEVEL_GAP;
+      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      rect.setAttribute("x", x);
+      rect.setAttribute("y", y);
+      rect.setAttribute("width", boxWidth[i]);
+      rect.setAttribute("height", BT_KEY_H);
+      rect.setAttribute("rx", 5);
+      rect.setAttribute("class", "btree-node-rect" + (i === 0 ? " btree-root" : ""));
+      svg.appendChild(rect);
+      for (let k = 1; k < node.keys.length; k++) {
+        const divider = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        divider.setAttribute("x1", x + k * BT_KEY_W); divider.setAttribute("y1", y);
+        divider.setAttribute("x2", x + k * BT_KEY_W); divider.setAttribute("y2", y + BT_KEY_H);
+        divider.setAttribute("class", "btree-key-divider");
+        svg.appendChild(divider);
+      }
+      node.keys.forEach((k, ki) => {
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", x + ki * BT_KEY_W + BT_KEY_W / 2);
+        text.setAttribute("y", y + BT_KEY_H / 2);
+        text.setAttribute("class", "tree-node-text");
+        text.textContent = formatValue(k);
+        svg.appendChild(text);
+      });
     }
     container.appendChild(svg);
   }
@@ -1565,6 +1706,14 @@
       // subtree reassigned to a different parent), so there's no stable
       // layout to diff/animate -- just redraw.
       renderTree(shape.body, value);
+      zone.rendered[name] = { kind };
+      return;
+    }
+
+    if (kind === "btree") {
+      // Splitting reshuffles keys across nodes freely -- same story, just
+      // redraw rather than trying to diff/animate.
+      renderBTree(shape.body, value);
       zone.rendered[name] = { kind };
       return;
     }

@@ -22,6 +22,7 @@ MAX_SECONDS = 5.0
 MAX_REPR_ITEMS = 500
 MAX_STR_LEN = 2000
 MAX_TREE_NODES = 2000
+MAX_BTREE_NODES = 2000
 
 
 class TraceLimitExceeded(Exception):
@@ -92,6 +93,12 @@ def _safe_value(value, depth=0):
         # below meant to bound accidental *generic* deep nesting, and a
         # flat list also sidesteps ever needing to worry about it.
         return {"__kind__": "tree", "nodes": _walk_tree(value, tree_value_attr)}
+    if _is_btree_node(value):
+        # Duck-typed B-tree node: `.keys` (several per node, unlike a
+        # binary tree's single `.val`) plus `.children` (0 for a leaf,
+        # len(keys)+1 for an internal node). Same flat, index-linked shape
+        # as the binary-tree case, one node per list entry.
+        return {"__kind__": "btree", "nodes": _walk_btree(value)}
     # Fallback for anything else (custom objects, functions, modules, etc.)
     try:
         return repr(value)
@@ -180,6 +187,54 @@ def _walk_tree(root, value_attr):
             "val": _safe_value(getattr(node, value_attr, None)),
             "left": left_idx,
             "right": right_idx,
+        })
+    return nodes
+
+
+def _is_btree_node(value):
+    """True if `value` looks like a B-tree node: `.keys` and `.children`,
+    both actual lists (not, say, a dict's `.keys()` method -- dicts are
+    already handled above and never reach here). `.children` may be empty
+    (a leaf) or have one more entry than `.keys` (an internal node); either
+    way it's a shape no other duck-typed case here matches.
+    """
+    if isinstance(value, (list, tuple, dict, set, str, int, float, bool)) or value is None:
+        return False
+    keys = getattr(value, "keys", None)
+    children = getattr(value, "children", None)
+    return isinstance(keys, (list, tuple)) and isinstance(children, (list, tuple))
+
+
+def _walk_btree(root):
+    """Flattens a B-tree into a BFS-ordered node list: each entry is
+    {"keys": [...], "children": [...]}, where `children` holds indices
+    into that same list (or None for a not-yet-linked slot) rather than
+    nested objects -- same rationale as `_walk_tree`, generalized from two
+    children to however many a node has.
+    """
+    index_of = {id(root): 0}
+    queue = [root]
+    nodes = []
+    i = 0
+    while i < len(queue):
+        node = queue[i]
+        i += 1
+        if len(nodes) >= MAX_BTREE_NODES:
+            nodes.append({"keys": ["..."], "children": []})
+            break
+        child_idxs = []
+        for child in getattr(node, "children", []):
+            if child is None:
+                child_idxs.append(None)
+                continue
+            if id(child) not in index_of:
+                index_of[id(child)] = len(queue)
+                queue.append(child)
+            child_idxs.append(index_of[id(child)])
+        keys = list(getattr(node, "keys", []))[:MAX_REPR_ITEMS]
+        nodes.append({
+            "keys": [_safe_value(k) for k in keys],
+            "children": child_idxs,
         })
     return nodes
 
@@ -339,7 +394,7 @@ def trace_function_call(source_code, func_name, call_args, arg_names=None, build
             # {__kind__, values} shape is still what shows up inside each
             # step's locals, which is what the frontend actually renders.
             result = result["values"]
-        elif isinstance(result, dict) and result.get("__kind__") == "tree":
+        elif isinstance(result, dict) and result.get("__kind__") in ("tree", "btree"):
             result = result["nodes"]
     except TraceLimitExceeded as e:
         sys.settrace(None)
