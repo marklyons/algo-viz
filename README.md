@@ -70,14 +70,13 @@ Then open http://127.0.0.1:5057
 3. **Run All Tests** checks your solution against every official test case
    without the step-by-step overhead — a quick correctness check while
    iterating.
-4. Edit the code any time — double-click the code panel (once a run has
-   highlighted a line) to go back to editing, tweak something (e.g. remove
-   the `+ 1` in `exclusiveTime`'s `end` branch to reproduce a classic
-   off-by-one), and re-run to see exactly where the result diverges.
-   Edits are saved per problem in the browser's local storage as you type,
-   so reloading the page or switching problems and back won't discard your
-   changes. **Reset** clears that saved copy and goes back to the original
-   starter code.
+4. Edit the code any time, including mid-run — tweak something (e.g.
+   remove the `+ 1` in `exclusiveTime`'s `end` branch to reproduce a
+   classic off-by-one) and re-run to see exactly where the result
+   diverges. Edits are saved per problem in the browser's local storage as
+   you type, so reloading the page or switching problems and back won't
+   discard your changes. **Reset** clears that saved copy and goes back to
+   the original starter code.
 5. Drag any shape — an array, a stack, a loop box — anywhere on the
    canvas. It snaps into alignment with a neighboring shape's edges or
    center as you get close, so you can, say, stack two same-sized arrays

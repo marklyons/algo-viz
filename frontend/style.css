@@ -91,7 +91,6 @@ html, body {
 .cm-s-algoviz .cm-builtin { color: #0550ae; }
 .cm-s-algoviz .cm-atom { color: #b35900; }
 .cm-s-algoviz .cm-active-line-highlight { background: rgba(43, 108, 255, 0.12); box-shadow: inset 2px 0 0 var(--accent); }
-.cm-s-algoviz.readonly-mode .CodeMirror-cursor { display: none; }
 
 .controls {
   border-top: 1px solid var(--line);

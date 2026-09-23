@@ -4,7 +4,6 @@
   const problemSelect = el("problemSelect");
   const leetcodeLink = el("leetcodeLink");
   const resetCodeBtn = el("resetCodeBtn");
-  const editBtn = el("editBtn");
   const testSelect = el("testSelect");
   const runBtn = el("runBtn");
   const runAllBtn = el("runAllBtn");
@@ -324,27 +323,12 @@
     viewportMargin: Infinity,
   });
 
-  function setReadOnly(readOnly) {
-    cm.setOption("readOnly", readOnly ? "nocursor" : false);
-    cm.getWrapperElement().classList.toggle("readonly-mode", readOnly);
-    editBtn.classList.toggle("hidden", !readOnly);
-  }
-
   function clearActiveLine() {
     if (state.activeLineHandle != null) {
       cm.removeLineClass(state.activeLineHandle, "background", "cm-active-line-highlight");
       state.activeLineHandle = null;
     }
   }
-
-  function unlockEditing() {
-    stopPlaying();
-    clearActiveLine();
-    setReadOnly(false);
-  }
-
-  el("codeMirrorHost").addEventListener("dblclick", () => { if (cm.getOption("readOnly")) unlockEditing(); });
-  editBtn.addEventListener("click", unlockEditing);
 
   // ---------- code persistence: remember your edits per-problem ----------
   // So reloading the page or switching problems and back doesn't discard
@@ -446,7 +430,6 @@
     statusLine.className = "status";
     playbackRow.classList.add("hidden");
     clearActiveLine();
-    setReadOnly(false);
     resetCanvasState();
   }
 
@@ -508,7 +491,6 @@
 
     state.steps = resp.steps || [];
     if (state.steps.length) precomputeLayout();
-    setReadOnly(state.steps.length > 0);
 
     playbackRow.classList.toggle("hidden", state.steps.length === 0);
     scrubber.max = Math.max(0, state.steps.length - 1);
