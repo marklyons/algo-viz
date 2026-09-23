@@ -77,7 +77,14 @@ Then open http://127.0.0.1:5057
    you type, so reloading the page or switching problems and back won't
    discard your changes. **Reset** clears that saved copy and goes back to
    the original starter code.
-5. Drag any shape — an array, a stack, a loop box — anywhere on the
+5. Pick a test case from the dropdown, or **Custom…** to start from the
+   first test's input and edit it into your own. Click the magnifier next
+   to the dropdown to open the **input explorer** — one raw-JSON textarea
+   per argument, for reshaping an input beyond what click-editing a single
+   given-bar cell can do (growing an array, restructuring something
+   nested). An empty field shows that argument's shape from the first test
+   as a placeholder.
+6. Drag any shape — an array, a stack, a loop box — anywhere on the
    canvas. It snaps into alignment with a neighboring shape's edges or
    center as you get close, so you can, say, stack two same-sized arrays
    directly on top of each other for an easy element-by-element

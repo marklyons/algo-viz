@@ -5,6 +5,8 @@
   const leetcodeLink = el("leetcodeLink");
   const resetCodeBtn = el("resetCodeBtn");
   const testSelect = el("testSelect");
+  const inputExplorerBtn = el("inputExplorerBtn");
+  const inputExplorer = el("inputExplorer");
   const runBtn = el("runBtn");
   const runAllBtn = el("runAllBtn");
   const statusLine = el("statusLine");
@@ -401,6 +403,14 @@
       opt.textContent = t.name;
       testSelect.appendChild(opt);
     });
+    // A synthetic last entry with no fixed args of its own -- see
+    // currentTest() -- so there's always a quick way to start from a
+    // known-valid shape and edit it into a scratch test case, rather than
+    // only ever being able to tweak individual cells of a real one.
+    const customOpt = document.createElement("option");
+    customOpt.value = "custom";
+    customOpt.textContent = "Custom…";
+    testSelect.appendChild(customOpt);
 
     resetCurrentArgs();
     clearRun();
@@ -411,10 +421,17 @@
   function resetCurrentArgs() {
     state.currentArgs = cloneArgs(currentTest().args);
     renderGivenBar();
+    renderInputExplorer();
   }
 
   problemSelect.addEventListener("change", () => loadProblem(problemSelect.value));
-  testSelect.addEventListener("change", () => { resetCurrentArgs(); clearRun(); });
+  testSelect.addEventListener("change", () => {
+    resetCurrentArgs();
+    clearRun();
+    // The whole point of "Custom" is to dive in and edit -- open the
+    // explorer automatically instead of making that a second step.
+    if (testSelect.value === "custom") openInputExplorer();
+  });
   resetCodeBtn.addEventListener("click", () => {
     if (!state.problem) return;
     cm.setValue(state.problem.starter_code);
@@ -454,6 +471,14 @@
 
   // ---------- running ----------
   function currentTest() {
+    if (testSelect.value === "custom") {
+      // No fixed args of its own -- starts from the first real test's
+      // shape (a genuinely valid example) each time it's selected, purely
+      // as a starting point to edit into a scratch case. `expected` is
+      // deliberately absent: there's nothing to check a custom input
+      // against.
+      return { name: "Custom", args: cloneArgs(state.problem.tests[0].args) };
+    }
     return state.problem.tests[parseInt(testSelect.value, 10)];
   }
 
@@ -477,9 +502,11 @@
     if (resp.error) {
       statusLine.textContent = `line ${resp.error.line ?? "?"}: ${resp.error.message}`;
       statusLine.className = "status err";
-    } else if (JSON.stringify(state.currentArgs) !== JSON.stringify(test.args)) {
-      // input was hand-edited — there's no "expected" to compare against
-      statusLine.textContent = `→ ${JSON.stringify(resp.result)} (edited input)`;
+    } else if (test.expected === undefined || JSON.stringify(state.currentArgs) !== JSON.stringify(test.args)) {
+      // Custom input, or a real test's input hand-edited away from its
+      // original values -- either way there's no "expected" to compare
+      // against.
+      statusLine.textContent = `→ ${JSON.stringify(resp.result)}${test.expected === undefined ? "" : " (edited input)"}`;
       statusLine.className = "status";
     } else {
       const matches = JSON.stringify(resp.result) === JSON.stringify(test.expected);
@@ -728,6 +755,7 @@
     el.addEventListener("blur", () => {
       if (tryCommit()) {
         renderGivenBar();
+        renderInputExplorer();
       } else {
         el.textContent = original;
         el.classList.add("invalid-flash");
@@ -770,6 +798,69 @@
     const result = coerceLike(state.currentArgs[argIndex][cellIdx], cellEl.textContent.trim());
     if (!result.ok) return false;
     state.currentArgs[argIndex][cellIdx] = result.value;
+    return true;
+  }
+
+  // ---------- input explorer: full-JSON view/edit of every argument ----------
+  // The given-bar's per-cell editing (above) only ever replaces one
+  // existing cell's value -- it can't add or remove array elements, or
+  // reshape a nested structure. This is the same state.currentArgs, just
+  // edited as raw JSON per argument instead, so anything the given-bar
+  // can't do (grow an array, build a fresh nested shape from scratch) is
+  // just a textarea edit away.
+  function openInputExplorer() {
+    inputExplorer.classList.remove("hidden");
+    renderInputExplorer();
+  }
+
+  inputExplorerBtn.addEventListener("click", () => {
+    inputExplorer.classList.contains("hidden") ? openInputExplorer() : inputExplorer.classList.add("hidden");
+  });
+
+  function renderInputExplorer() {
+    if (!state.problem || inputExplorer.classList.contains("hidden")) return;
+    inputExplorer.innerHTML = "";
+    const argNames = state.problem.arg_names || [];
+    const firstTestArgs = state.problem.tests[0].args;
+    argNames.forEach((name, argIndex) => {
+      const field = document.createElement("div");
+      field.className = "input-explorer-field";
+      const label = document.createElement("label");
+      label.textContent = name;
+      field.appendChild(label);
+      const textarea = document.createElement("textarea");
+      textarea.className = "input-explorer-textarea";
+      textarea.spellcheck = false;
+      textarea.value = JSON.stringify(state.currentArgs[argIndex], null, 2);
+      // Shown only if the field is actually cleared out -- a quick "this
+      // is the shape I need" reference distinct from a real, runnable
+      // value, which the textarea is otherwise always pre-filled with.
+      textarea.placeholder = JSON.stringify(firstTestArgs[argIndex], null, 2);
+      textarea.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") { e.preventDefault(); textarea.value = JSON.stringify(state.currentArgs[argIndex], null, 2); textarea.blur(); }
+      });
+      textarea.addEventListener("blur", () => {
+        if (commitExplorerField(argIndex, textarea)) {
+          renderGivenBar();
+          renderInputExplorer();
+        } else {
+          textarea.classList.add("invalid-flash");
+          setTimeout(() => textarea.classList.remove("invalid-flash"), 400);
+        }
+      });
+      field.appendChild(textarea);
+      inputExplorer.appendChild(field);
+    });
+  }
+
+  function commitExplorerField(argIndex, textareaEl) {
+    let parsed;
+    try {
+      parsed = JSON.parse(textareaEl.value);
+    } catch {
+      return false;
+    }
+    state.currentArgs[argIndex] = parsed;
     return true;
   }
 

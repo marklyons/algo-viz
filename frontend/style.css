@@ -138,6 +138,37 @@ select {
 #speedSlider { width: 70px; }
 .step-counter { font-size: 11px; color: var(--ink-faint); white-space: nowrap; }
 
+/* full-JSON view/edit of every argument -- one labeled textarea per
+   arg_name, toggled by the magnifier button next to the test picker */
+.input-explorer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+.input-explorer-field { display: flex; flex-direction: column; gap: 3px; }
+.input-explorer-field label {
+  font-family: var(--hand);
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.input-explorer-textarea {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 6px 8px;
+  resize: vertical;
+  min-height: 44px;
+  outline: none;
+}
+.input-explorer-textarea::placeholder { color: var(--ink-faint); }
+.input-explorer-textarea:focus { border-color: var(--accent); background: rgba(43, 108, 255, 0.05); }
+.input-explorer-textarea.invalid-flash { background: rgba(224, 72, 62, 0.28) !important; }
+
 .canvas-col { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
 
 /* the "given" strip: function parameters, shown and edited separately from
