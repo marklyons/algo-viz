@@ -661,6 +661,14 @@
   // How "big" a value is, for reserving flow-layout space ahead of time —
   // unified across kinds so precomputeLayout doesn't need per-kind branches.
   function sizeOf(kind, value) {
+    // A variable's kind can legitimately differ across steps (e.g. a
+    // `best_sum=None` default parameter that's an array everywhere else) --
+    // precomputeLayout always sizes `maxVal[name]` against the *current*
+    // step's kind, which can be a real mismatch against a value recorded
+    // on an earlier, differently-shaped step. null/undefined never has a
+    // meaningful size regardless of kind, so it's handled before anything
+    // kind-specific gets a chance to dereference it.
+    if (value === null || value === undefined) return 0;
     if (kind === "scalar") return formatValue(value).length;
     if (kind === "map") return value.entries.length;
     if (kind === "linked-list") return value.values.length;
